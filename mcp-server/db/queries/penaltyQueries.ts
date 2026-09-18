@@ -22,3 +22,8 @@ export async function createPenalty(env: Env, values: typeof penalty.$inferInser
 
   return result[0];
 }
+
+// No hay una tasa/moneda definida en el modelo, así que el puntaje penalizado es directamente el monto.
+export function calculatePenaltyAmount(penalty: { penalizedScoring: number }) {
+  return penalty.penalizedScoring;
+}

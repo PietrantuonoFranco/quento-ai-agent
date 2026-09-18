@@ -1,6 +1,6 @@
 import { getDb } from "../database";
 import { schedule } from "../schemas";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type Env from "../../lib/interfaces/EnvInterface";
 
 export async function getScheduleById(env: Env, id: number) {
@@ -21,4 +21,20 @@ export async function createSchedule(env: Env, values: typeof schedule.$inferIns
   const result = await db.insert(schedule).values(values).returning();
 
   return result[0];
+}
+
+export async function getScheduleByCourtIdAndDay(env: Env, courtId: number, dayOfWeek: string) {
+  const db = getDb(env);
+  const result = await db
+    .select()
+    .from(schedule)
+    .where(and(eq(schedule.courtId, courtId), eq(schedule.dayOfWeek, dayOfWeek)))
+    .limit(1);
+
+  return result[0] || null;
+}
+
+// openingTime/closingTime llegan de la columna "time" como strings "HH:MM:SS", comparables lexicográficamente.
+export function isWithinOpeningHours(schedule: { openingTime: string; closingTime: string }, time: string) {
+  return time >= schedule.openingTime && time <= schedule.closingTime;
 }
