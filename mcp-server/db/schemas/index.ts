@@ -1,0 +1,13 @@
+export { account } from "./accountSchema";
+export { admin } from "./adminSchema";
+export { booker } from "./bookerSchema";
+export { booking } from "./bookingSchema";
+export { chatRoom } from "./chatRoomSchema";
+export { court } from "./courtSchema";
+export { matchPlayer } from "./matchPlayerSchema";
+export { match } from "./matchSchema";
+export { message } from "./messageSchema";
+export { outOfService } from "./outOfServiceSchema";
+export { penalty } from "./penaltySchema";
+export { player } from "./playerSchema";
+export { schedule } from "./scheduleSchema";
