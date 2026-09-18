@@ -1,7 +1,7 @@
 enum OutOfServiceReason {
   MAINTENANCE = "maintenance",
-  DAMAGE = "damage",
-  WEATHER = "weather",
+  FREE_DAY = "free_day",
+  CLEANING = "cleaning",
   OTHER = "other",
 }
 

@@ -1,12 +1,12 @@
 enum PlayerCategory {
-  FIRST = "1",
-  SECOND = "2",
-  THIRD = "3",
-  FOURTH = "4",
-  FIFTH = "5",
-  SIXTH = "6",
-  SEVENTH = "7",
-  EIGHTH = "8",
+  FIRST = "1st",
+  SECOND = "2nd",
+  THIRD = "3rd",
+  FOURTH = "4th",
+  FIFTH = "5th",
+  SIXTH = "6th",
+  SEVENTH = "7th",
+  WITHOUT_CATEGORY = "without_category",
 }
 
 export default PlayerCategory;
