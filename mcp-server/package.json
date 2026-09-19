@@ -13,7 +13,7 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
-    "migrate": "tsx src/db/seeds/migrate.ts"
+    "seed": "tsx src/db/seeds/seed.ts"
   },
   "keywords": [],
   "author": "",

@@ -55,7 +55,7 @@ CREATE TABLE "courts" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "matches" (
+CREATE TABLE "matchs" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"booking_id" integer NOT NULL,
 	"need_players" boolean DEFAULT false NOT NULL,
@@ -121,9 +121,9 @@ CREATE TABLE "schedules" (
 ALTER TABLE "admins" ADD CONSTRAINT "admins_account_id_accounts_id_fk" FOREIGN KEY ("account_id") REFERENCES "public"."accounts"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "bookings" ADD CONSTRAINT "bookings_court_id_courts_id_fk" FOREIGN KEY ("court_id") REFERENCES "public"."courts"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "bookings" ADD CONSTRAINT "bookings_booker_phone_number_bookers_phone_number_fk" FOREIGN KEY ("booker_phone_number") REFERENCES "public"."bookers"("phone_number") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "chat_rooms" ADD CONSTRAINT "chat_rooms_match_id_matches_id_fk" FOREIGN KEY ("match_id") REFERENCES "public"."matches"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "matches" ADD CONSTRAINT "matches_booking_id_bookings_id_fk" FOREIGN KEY ("booking_id") REFERENCES "public"."bookings"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "match_players" ADD CONSTRAINT "match_players_match_id_matches_id_fk" FOREIGN KEY ("match_id") REFERENCES "public"."matches"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "chat_rooms" ADD CONSTRAINT "chat_rooms_match_id_matchs_id_fk" FOREIGN KEY ("match_id") REFERENCES "public"."matchs"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "matchs" ADD CONSTRAINT "matchs_booking_id_bookings_id_fk" FOREIGN KEY ("booking_id") REFERENCES "public"."bookings"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "match_players" ADD CONSTRAINT "match_players_match_id_matchs_id_fk" FOREIGN KEY ("match_id") REFERENCES "public"."matchs"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "match_players" ADD CONSTRAINT "match_players_player_id_players_id_fk" FOREIGN KEY ("player_id") REFERENCES "public"."players"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "messages" ADD CONSTRAINT "messages_chat_room_id_chat_rooms_id_fk" FOREIGN KEY ("chat_room_id") REFERENCES "public"."chat_rooms"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "messages" ADD CONSTRAINT "messages_player_id_players_id_fk" FOREIGN KEY ("player_id") REFERENCES "public"."players"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint

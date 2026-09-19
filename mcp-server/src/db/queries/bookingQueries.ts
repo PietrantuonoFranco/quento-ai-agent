@@ -47,8 +47,8 @@ export async function checkBookingAvailability(env: Env, courtId: number, dateti
       and(
         eq(booking.courtId, courtId),
         ne(booking.bookingState, BookingState.CANCELLED),
-        sql`${booking.datetime} < ${end}`,
-        sql`${booking.datetime} + (${booking.durationMinutes} || ' minutes')::interval > ${datetime}`,
+        sql`${booking.datetime} < ${end.toISOString()}::timestamp`,
+        sql`${booking.datetime} + (${booking.durationMinutes} || ' minutes')::interval > ${datetime.toISOString()}::timestamp`,
       ),
     );
 

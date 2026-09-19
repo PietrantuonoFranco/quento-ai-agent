@@ -323,10 +323,10 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "chat_rooms_match_id_matches_id_fk": {
-          "name": "chat_rooms_match_id_matches_id_fk",
+        "chat_rooms_match_id_matchs_id_fk": {
+          "name": "chat_rooms_match_id_matchs_id_fk",
           "tableFrom": "chat_rooms",
-          "tableTo": "matches",
+          "tableTo": "matchs",
           "columnsFrom": [
             "match_id"
           ],
@@ -388,8 +388,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.matches": {
-      "name": "matches",
+    "public.matchs": {
+      "name": "matchs",
       "schema": "",
       "columns": {
         "id": {
@@ -428,9 +428,9 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "matches_booking_id_bookings_id_fk": {
-          "name": "matches_booking_id_bookings_id_fk",
-          "tableFrom": "matches",
+        "matchs_booking_id_bookings_id_fk": {
+          "name": "matchs_booking_id_bookings_id_fk",
+          "tableFrom": "matchs",
           "tableTo": "bookings",
           "columnsFrom": [
             "booking_id"
@@ -467,10 +467,10 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "match_players_match_id_matches_id_fk": {
-          "name": "match_players_match_id_matches_id_fk",
+        "match_players_match_id_matchs_id_fk": {
+          "name": "match_players_match_id_matchs_id_fk",
           "tableFrom": "match_players",
-          "tableTo": "matches",
+          "tableTo": "matchs",
           "columnsFrom": [
             "match_id"
           ],

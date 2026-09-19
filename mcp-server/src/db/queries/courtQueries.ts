@@ -73,8 +73,8 @@ export async function checkCourtAvailability(env: Env, courtId: number, datetime
     .where(
       and(
         eq(outOfService.courtId, courtId),
-        sql`${outOfService.fromDatetime} < ${end}`,
-        sql`${outOfService.toDatetime} > ${datetime}`,
+        sql`${outOfService.fromDatetime} < ${end.toISOString()}::timestamp`,
+        sql`${outOfService.toDatetime} > ${datetime.toISOString()}::timestamp`,
       ),
     );
 

@@ -147,7 +147,7 @@ export function getBookingTools(env: Env): Tool[] {
 
         return createBooking(env, {
           courtId: input.courtId,
-          playerId: booker.id,
+          bookerPhoneNumber: input.bookerPhoneNumber,
           datetime,
           durationMinutes: BOOKING_DURATION_MINUTES,
           bookingState: BookingState.RESERVED,

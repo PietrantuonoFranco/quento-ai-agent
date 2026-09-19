@@ -41,8 +41,8 @@ export async function cancelBookingsAffectedByOutOfService(env: Env, outOfServic
       and(
         eq(booking.courtId, record.courtId),
         ne(booking.bookingState, BookingState.CANCELLED),
-        sql`${booking.datetime} < ${record.toDatetime}`,
-        sql`${booking.datetime} + (${booking.durationMinutes} || ' minutes')::interval > ${record.fromDatetime}`,
+        sql`${booking.datetime} < ${record.toDatetime.toISOString()}::timestamp`,
+        sql`${booking.datetime} + (${booking.durationMinutes} || ' minutes')::interval > ${record.fromDatetime.toISOString()}::timestamp`,
       ),
     )
     .returning();
