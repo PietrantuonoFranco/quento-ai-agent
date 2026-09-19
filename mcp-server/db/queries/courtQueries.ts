@@ -26,6 +26,16 @@ export async function createCourt(env: Env, values: typeof court.$inferInsert) {
   return result[0];
 }
 
+export async function getAllCourts(env: Env, state?: string) {
+  const db = getDb(env);
+
+  if (state !== undefined) {
+    return db.select().from(court).where(eq(court.state, state));
+  }
+
+  return db.select().from(court);
+}
+
 export async function blockCourt(env: Env, id: number) {
   const db = getDb(env);
   const result = await db
