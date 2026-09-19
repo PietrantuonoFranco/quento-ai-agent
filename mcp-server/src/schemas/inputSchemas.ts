@@ -4,7 +4,9 @@ import CourtState from "../lib/enums/courtState";
 import PlayerCategory from "../lib/enums/playerCategory";
 
 /**
- * Consultar turnos disponibles para una fecha (y opcionalmente una cancha/duración específica).
+ * Consultar turnos disponibles para una fecha (y opcionalmente una cancha específica).
+ * Todos los turnos tienen una duración fija (ver BOOKING_DURATION_MINUTES), así que no
+ * se pide como parámetro.
  */
 export const getAvailableBookingsInputSchema = z.object({
   date: z.string().describe("Date to check availability for (YYYY-MM-DD)"),
@@ -14,12 +16,6 @@ export const getAvailableBookingsInputSchema = z.object({
     .positive()
     .optional()
     .describe("Specific court ID to check; if omitted, checks every court"),
-  durationMinutes: z
-    .number()
-    .int()
-    .positive()
-    .optional()
-    .describe("Desired booking duration in minutes; defaults to a standard slot if omitted"),
 });
 
 /**
@@ -39,13 +35,16 @@ export const registerBookerInputSchema = z.object({
 });
 
 /**
- * Agendar un turno (reserva) para una cancha.
+ * Agendar un turno (reserva) para una cancha. La duración es fija (ver
+ * BOOKING_DURATION_MINUTES) y el horario debe caer justo en un turno de la
+ * grilla de esa cancha (los devueltos por get_available_bookings).
  */
 export const createBookingInputSchema = z.object({
   courtId: z.number().int().positive().describe("The court ID to book"),
   bookerPhoneNumber: z.string().describe("The phone number of the registered booker"),
-  datetime: z.string().describe("ISO datetime for the start of the booking"),
-  durationMinutes: z.number().int().positive().describe("The booking duration in minutes"),
+  datetime: z
+    .string()
+    .describe("ISO datetime for the start of the booking; must match one of the court's fixed slot start times"),
 });
 
 /**

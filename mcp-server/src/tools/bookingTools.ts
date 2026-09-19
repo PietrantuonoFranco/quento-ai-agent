@@ -9,6 +9,7 @@ import {
 import BookingState from "../lib/enums/bookingState";
 import CourtState from "../lib/enums/courtState";
 import DayOfWeek from "../lib/enums/dayOfWeek";
+import { BOOKING_DURATION_MINUTES } from "../lib/constants";
 import type Env from "../lib/interfaces/EnvInterface";
 import type Tool from "../lib/interfaces/ToolInterface";
 
@@ -39,12 +40,10 @@ function slotStartDate(date: string, minutesSinceMidnight: number): Date {
   return new Date(`${date}T${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00`);
 }
 
-async function findAvailableSlots(
-  env: Env,
-  courtId: number,
-  date: string,
-  durationMinutes: number,
-) {
+// Arma la grilla fija de turnos de la cancha para ese día (bloques de
+// BOOKING_DURATION_MINUTES desde la apertura) y devuelve solo los que no
+// están creados todavía.
+async function findAvailableSlots(env: Env, courtId: number, date: string) {
   const schedule = await getScheduleByCourtIdAndDay(env, courtId, getDayOfWeek(date));
 
   if (!schedule) return [];
@@ -53,9 +52,13 @@ async function findAvailableSlots(
   const closeMinutes = timeToMinutes(schedule.closingTime);
   const slots: string[] = [];
 
-  for (let start = openMinutes; start + durationMinutes <= closeMinutes; start += durationMinutes) {
+  for (
+    let start = openMinutes;
+    start + BOOKING_DURATION_MINUTES <= closeMinutes;
+    start += BOOKING_DURATION_MINUTES
+  ) {
     const slotStart = slotStartDate(date, start);
-    const conflicts = await checkBookingAvailability(env, courtId, slotStart, durationMinutes);
+    const conflicts = await checkBookingAvailability(env, courtId, slotStart, BOOKING_DURATION_MINUTES);
 
     if (conflicts === 0) slots.push(slotStart.toISOString());
   }
@@ -63,14 +66,31 @@ async function findAvailableSlots(
   return slots;
 }
 
+// Un turno solo es válido si arranca justo en uno de los bloques de la
+// grilla (apertura, apertura + 90', apertura + 180', ...) y entra completo
+// antes del cierre.
+async function isValidSlotStart(env: Env, courtId: number, datetime: Date) {
+  const date = datetime.toISOString().slice(0, 10);
+  const schedule = await getScheduleByCourtIdAndDay(env, courtId, getDayOfWeek(date));
+
+  if (!schedule) return false;
+
+  const openMinutes = timeToMinutes(schedule.openingTime);
+  const closeMinutes = timeToMinutes(schedule.closingTime);
+  const slotMinutes = datetime.getHours() * 60 + datetime.getMinutes();
+
+  if (slotMinutes < openMinutes || slotMinutes + BOOKING_DURATION_MINUTES > closeMinutes) return false;
+
+  return (slotMinutes - openMinutes) % BOOKING_DURATION_MINUTES === 0;
+}
+
 export function getBookingTools(env: Env): Tool[] {
   return [
     {
       name: "get_available_bookings",
-      description: "Lists available booking slots for a given date, optionally for a specific court and duration",
+      description: "Lists available fixed-length booking slots for a given date, optionally for a specific court",
       inputSchema: getAvailableBookingsInputSchema,
       execute: async (input) => {
-        const durationMinutes = input.durationMinutes ?? 60;
         const courts = input.courtId
           ? [await getCourtById(env, input.courtId)].filter((c): c is NonNullable<typeof c> => c !== null)
           : await getAllCourts(env, CourtState.AVAILABLE);
@@ -78,7 +98,7 @@ export function getBookingTools(env: Env): Tool[] {
         const availability = [];
 
         for (const courtRow of courts) {
-          const slots = await findAvailableSlots(env, courtRow.id, input.date, durationMinutes);
+          const slots = await findAvailableSlots(env, courtRow.id, input.date);
 
           if (slots.length > 0) {
             availability.push({ courtId: courtRow.id, courtNumber: courtRow.number, slots });
@@ -100,7 +120,12 @@ export function getBookingTools(env: Env): Tool[] {
         }
 
         const datetime = new Date(input.datetime);
-        const conflicts = await checkCourtAvailability(env, input.courtId, datetime, input.durationMinutes);
+
+        if (!(await isValidSlotStart(env, input.courtId, datetime))) {
+          throw new Error("The requested time does not match one of the court's fixed booking slots");
+        }
+
+        const conflicts = await checkCourtAvailability(env, input.courtId, datetime, BOOKING_DURATION_MINUTES);
 
         if (conflicts > 0) {
           throw new Error("The court is not available for the requested time slot");
@@ -110,7 +135,7 @@ export function getBookingTools(env: Env): Tool[] {
           courtId: input.courtId,
           bookerPhoneNumber: input.bookerPhoneNumber,
           datetime,
-          durationMinutes: input.durationMinutes,
+          durationMinutes: BOOKING_DURATION_MINUTES,
           bookingState: BookingState.RESERVED,
         });
       },
