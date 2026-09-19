@@ -1,6 +1,6 @@
 import { getDb } from "../database";
-import { booking, match, matchPlayer } from "../schemas";
-import { eq } from "drizzle-orm";
+import { booking, match, matchPlayer, player } from "../schemas";
+import { and, eq, sql } from "drizzle-orm";
 import type Env from "../../lib/interfaces/EnvInterface";
 import BookingState from "../../lib/enums/bookingState";
 
@@ -23,6 +23,34 @@ export async function createMatch(env: Env, values: typeof match.$inferInsert) {
   const result = await db.insert(match).values(values).returning();
 
   return result[0];
+}
+
+export async function getOpenMatches(
+  env: Env,
+  filters: { date?: string; courtId?: number; category?: string } = {},
+) {
+  const db = getDb(env);
+
+  const conditions = [eq(match.needPlayers, true)];
+
+  if (filters.courtId !== undefined) conditions.push(eq(booking.courtId, filters.courtId));
+  if (filters.date !== undefined) conditions.push(sql`${booking.datetime}::date = ${filters.date}::date`);
+  if (filters.category !== undefined) conditions.push(eq(player.category, filters.category));
+
+  return db
+    .selectDistinct({
+      id: match.id,
+      bookingId: match.bookingId,
+      needPlayers: match.needPlayers,
+      courtId: booking.courtId,
+      datetime: booking.datetime,
+      durationMinutes: booking.durationMinutes,
+    })
+    .from(match)
+    .innerJoin(booking, eq(match.bookingId, booking.id))
+    .leftJoin(matchPlayer, eq(matchPlayer.matchId, match.id))
+    .leftJoin(player, eq(player.id, matchPlayer.playerId))
+    .where(and(...conditions));
 }
 
 export async function addPlayerToMatch(env: Env, matchId: number, playerId: number) {
