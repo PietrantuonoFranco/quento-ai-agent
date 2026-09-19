@@ -9,7 +9,11 @@ import PlayerCategory from "../lib/enums/playerCategory";
  * se pide como parámetro.
  */
 export const getAvailableBookingsInputSchema = z.object({
-  date: z.string().describe("Date to check availability for (YYYY-MM-DD)"),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected format YYYY-MM-DD")
+    .optional()
+    .describe("Date to check availability for (YYYY-MM-DD); defaults to today"),
   courtId: z
     .number()
     .int()

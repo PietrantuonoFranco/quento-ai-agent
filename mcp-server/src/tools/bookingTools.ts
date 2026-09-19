@@ -9,7 +9,7 @@ import {
 import BookingState from "../lib/enums/bookingState";
 import CourtState from "../lib/enums/courtState";
 import DayOfWeek from "../lib/enums/dayOfWeek";
-import { BOOKING_DURATION_MINUTES } from "../lib/constants";
+import { BOOKING_DURATION_MINUTES, CLUB_TIMEZONE } from "../lib/constants";
 import type Env from "../lib/interfaces/EnvInterface";
 import type Tool from "../lib/interfaces/ToolInterface";
 
@@ -23,8 +23,15 @@ const WEEKDAYS = [
   DayOfWeek.SATURDAY,
 ];
 
+// Los horarios se guardan como hora de pared del club (columnas timestamp sin zona), así que
+// todas las fechas se arman y leen en UTC para que no dependan de la zona horaria del servidor.
 function getDayOfWeek(date: string): DayOfWeek {
-  return WEEKDAYS[new Date(`${date}T00:00:00`).getDay()];
+  return WEEKDAYS[new Date(`${date}T00:00:00Z`).getUTCDay()];
+}
+
+// Fecha de hoy (YYYY-MM-DD) en la zona horaria del club.
+function todayInClubTimezone(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: CLUB_TIMEZONE });
 }
 
 function timeToMinutes(time: string): number {
@@ -37,7 +44,7 @@ function slotStartDate(date: string, minutesSinceMidnight: number): Date {
   const hours = Math.floor(minutesSinceMidnight / 60);
   const minutes = minutesSinceMidnight % 60;
 
-  return new Date(`${date}T${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00`);
+  return new Date(`${date}T${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00Z`);
 }
 
 // Arma la grilla fija de turnos de la cancha para ese día (bloques de
@@ -77,7 +84,7 @@ async function isValidSlotStart(env: Env, courtId: number, datetime: Date) {
 
   const openMinutes = timeToMinutes(schedule.openingTime);
   const closeMinutes = timeToMinutes(schedule.closingTime);
-  const slotMinutes = datetime.getHours() * 60 + datetime.getMinutes();
+  const slotMinutes = datetime.getUTCHours() * 60 + datetime.getUTCMinutes();
 
   if (slotMinutes < openMinutes || slotMinutes + BOOKING_DURATION_MINUTES > closeMinutes) return false;
 
@@ -88,9 +95,11 @@ export function getBookingTools(env: Env): Tool[] {
   return [
     {
       name: "get_available_bookings",
-      description: "Lists available fixed-length booking slots for a given date, optionally for a specific court",
+      description:
+        "Lists available fixed-length booking slots for a given date (today if omitted), optionally for a specific court",
       inputSchema: getAvailableBookingsInputSchema,
       execute: async (input) => {
+        const date = input.date ?? todayInClubTimezone();
         const courts = input.courtId
           ? [await getCourtById(env, input.courtId)].filter((c): c is NonNullable<typeof c> => c !== null)
           : await getAllCourts(env, CourtState.AVAILABLE);
@@ -98,7 +107,7 @@ export function getBookingTools(env: Env): Tool[] {
         const availability = [];
 
         for (const courtRow of courts) {
-          const slots = await findAvailableSlots(env, courtRow.id, input.date);
+          const slots = await findAvailableSlots(env, courtRow.id, date);
 
           if (slots.length > 0) {
             availability.push({ courtId: courtRow.id, courtNumber: courtRow.number, slots });
@@ -119,7 +128,12 @@ export function getBookingTools(env: Env): Tool[] {
           throw new Error("The booker is not registered yet");
         }
 
-        const datetime = new Date(input.datetime);
+        // El horario es hora de pared del club: si no trae zona horaria se interpreta como tal (UTC nominal).
+        const datetime = new Date(/(Z|[+-]\d{2}:?\d{2})$/i.test(input.datetime) ? input.datetime : `${input.datetime}Z`);
+
+        if (Number.isNaN(datetime.getTime())) {
+          throw new Error("The requested datetime is not a valid ISO datetime");
+        }
 
         if (!(await isValidSlotStart(env, input.courtId, datetime))) {
           throw new Error("The requested time does not match one of the court's fixed booking slots");
@@ -133,7 +147,7 @@ export function getBookingTools(env: Env): Tool[] {
 
         return createBooking(env, {
           courtId: input.courtId,
-          bookerPhoneNumber: input.bookerPhoneNumber,
+          playerId: booker.id,
           datetime,
           durationMinutes: BOOKING_DURATION_MINUTES,
           bookingState: BookingState.RESERVED,
