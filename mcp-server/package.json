@@ -4,16 +4,17 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-		"deploy": "wrangler deploy",
-		"dev": "wrangler dev",
-		"start": "wrangler dev",
-		"test": "vitest",
-		"cf-typegen": "wrangler types",
-		"db:generate": "drizzle-kit generate",
-		"db:push": "drizzle-kit push",
-		"db:migrate": "drizzle-kit migrate",
-		"migrate": "tsx src/db/seeds/migrate.ts"
-	},
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "dev:local": "tsx watch dev-server.ts",
+    "start": "wrangler dev",
+    "test": "vitest",
+    "cf-typegen": "wrangler types",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:migrate": "drizzle-kit migrate",
+    "migrate": "tsx src/db/seeds/migrate.ts"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -25,15 +26,16 @@
     "postgres": "^3.4.9",
     "zod": "^4.6.5"
   },
-	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.12.4",
-		"@types/node": "^25.0.10",
-		"@types/pg": "^8.16.0",
-		"drizzle-kit": "^0.31.8",
-		"pg": "^8.17.2",
-		"tsx": "^4.7.0",
-		"typescript": "^5.5.2",
-		"vitest": "~3.2.0",
-		"wrangler": "^4.60.0"
-	}
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.12.4",
+    "@types/node": "^25.0.10",
+    "@types/pg": "^8.16.0",
+    "drizzle-kit": "^0.31.8",
+    "node-fetch": "^3.3.2",
+    "pg": "^8.17.2",
+    "tsx": "^4.7.0",
+    "typescript": "^5.5.2",
+    "vitest": "~3.2.0",
+    "wrangler": "^4.60.0"
+  }
 }
