@@ -3,7 +3,7 @@ import logging
 from typing import Any
 
 from google import genai
-from google.genai import types
+from google.genai import errors, types
 from mcp import types as mcp_types
 
 from client import ToolError, mcp_client
@@ -56,12 +56,19 @@ class Agent:
             # We run the loop ourselves so every tool call goes through inject_phone.
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
+        start = len(history)
         history.append(types.Content(role="user", parts=[types.Part(text=text)]))
 
         for _ in range(self._max_steps):
-            response = await self._llm.aio.models.generate_content(
-                model=self._model, contents=history, config=config
-            )
+            try:
+                response = await self._llm.aio.models.generate_content(
+                    model=self._model, contents=history, config=config
+                )
+            except errors.APIError as e:
+                # Overloaded model, rate limit, bad key... Drop this turn so the history stays consistent.
+                logger.error("Gemini request failed: %s", e)
+                del history[start:]
+                return FALLBACK_REPLY
             if not response.candidates or response.candidates[0].content is None:
                 logger.warning("Gemini returned no content (finish reason: %s)", _finish_reason(response))
                 return FALLBACK_REPLY
@@ -107,4 +114,8 @@ def _finish_reason(response: types.GenerateContentResponse) -> Any:
 
 
 def build_agent() -> Agent:
-    return Agent(mcp_client, genai.Client(api_key=conf.GEMINI_API_KEY), conf.GEMINI_MODEL)
+    # Gemini answers 503 when the model is overloaded; the SDK retries transient errors with backoff.
+    retry = types.HttpRetryOptions(attempts=5, initial_delay=1.0, max_delay=10.0, http_status_codes=[429, 500, 503, 504])
+    llm = genai.Client(api_key=conf.GEMINI_API_KEY, http_options=types.HttpOptions(retry_options=retry))
+
+    return Agent(mcp_client, llm, conf.GEMINI_MODEL)

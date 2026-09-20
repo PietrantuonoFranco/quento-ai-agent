@@ -22,7 +22,7 @@ WhatsApp (Meta Cloud API) ──webhook──▶ mcp-host (FastAPI)
 - **Confirmación explícita** del cliente antes de `create_booking`, `cancel_booking` y `reschedule_booking`.
 - **Registro perezoso:** el booker se busca o crea recién cuando el cliente confirma que quiere reservar, no al empezar la conversación. Las consultas (horarios, info del club, partidos abiertos) no lo necesitan. En ese momento el agente llama a `is_booker_registered`; si da `false`, pide nombre y apellido, llama a `register_booker` y recién entonces `create_booking`. Evita pedir datos a quien solo consulta y no crea bookers innecesarios. A verificar: `join_match` y `leave_match` usan `playerId`, así que unirse a un partido puede requerir registro también.
 - **Nombre del usuario:** WhatsApp solo entrega `wa_id` (el teléfono) y `profile.name` (nombre de perfil, texto libre que puede ser un apodo, un emoji o faltar). No hay forma de obtener nombre y apellido reales por la API. El host pasa `profile.name` al agente como contexto y como sugerencia ("¿Te registro como Fran? Pasame también tu apellido"). El nombre y apellido definitivos se piden en la conversación, solo la primera vez, y el LLM los extrae de la respuesta libre para llamar a `register_booker`.
-- **Modelo:** `gemini-2.5-flash` (tool calling, barato). El free tier tiene límites de rate para producción.
+- **Modelo:** `gemini-3.6-flash` por defecto (configurable con `GEMINI_MODEL`). Si responde 503 por demanda, el SDK reintenta con backoff y, si sigue fallando, el agente contesta con un mensaje de disculpas sin romper la conversación. El free tier tiene límites de rate para producción.
 - **Sin frameworks de orquestación al inicio:** loop propio con el SDK `google-genai` (ver "Preguntas abiertas").
 
 ## Fases

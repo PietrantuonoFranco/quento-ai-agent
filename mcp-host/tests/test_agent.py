@@ -2,7 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from google.genai import types
+from google.genai import errors, types
 from mcp import types as mcp_types
 
 from agent import FALLBACK_REPLY, Agent
@@ -203,3 +203,25 @@ async def test_loads_tools_once_and_keeps_history_across_messages(agent, llm, mc
 
     mcp.list_tools.assert_awaited_once()
     assert len(llm.generate.await_args.kwargs["contents"]) == 4
+
+
+def api_error(code=503):
+    return errors.ServerError(code, {"error": {"code": code, "message": "high demand", "status": "UNAVAILABLE"}})
+
+
+async def test_returns_the_fallback_when_gemini_is_unavailable(agent, llm):
+    llm.generate.side_effect = api_error()
+
+    assert await agent.respond([], "hola", PHONE) == FALLBACK_REPLY
+
+
+async def test_a_failed_turn_is_removed_from_the_history(agent, llm, mcp):
+    llm.generate.side_effect = [reply("uno"), tool_call(("get_available_times", {})), api_error(), reply("dos")]
+    history = []
+
+    await agent.respond(history, "a", PHONE)
+    assert await agent.respond(history, "b", PHONE) == FALLBACK_REPLY
+    assert len(history) == 2  # only the first, successful exchange
+
+    assert await agent.respond(history, "c", PHONE) == "dos"
+    assert [c.role for c in history] == ["user", "model", "user", "model"]

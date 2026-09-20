@@ -8,7 +8,7 @@ Quento es un asistente conversacional para la gestión de reservas de una cancha
 
 El sistema se divide en dos componentes principales:
 
-- **MCP Client / Host** (`mcp-host/`, Python + FastAPI): corre en Railway. Hoy es un esqueleto (solo expone un health check en `/`); su rol previsto es recibir los mensajes entrantes desde la WhatsApp API, mantener la conversación con el LLM y, cuando el LLM decide usar una herramienta, invocarla contra el MCP Server. También le pasa al LLM la lista de tools disponibles y los datos que las tools devuelven. Se configura con `MCP_SERVER_URL` y `LLM_URL` (ver `mcp-host/.env.example`).
+- **MCP Client / Host** (`mcp-host/`, Python + FastAPI): corre en Railway. Hoy es un esqueleto (solo expone un health check en `/`); su rol previsto es recibir los mensajes entrantes desde la WhatsApp API, mantener la conversación con el LLM y, cuando el LLM decide usar una herramienta, invocarla contra el MCP Server. También le pasa al LLM la lista de tools disponibles y los datos que las tools devuelven. Se configura con `MCP_SERVER_URL`, `MCP_API_KEY` y `GEMINI_API_KEY` (ver `mcp-host/.env.example`).
 - **MCP Server** (`mcp-server/`): corre como un **Cloudflare Worker**. Expone las herramientas de negocio (reservas, canchas, partidos, etc.) vía el protocolo MCP (Streamable HTTP) y se conecta a la base de datos PostgreSQL a través de **Cloudflare Hyperdrive** (pooling de conexiones y cacheo de queries). La base de datos en producción es un PostgreSQL gestionado en **Supabase**.
 
 Flujo de un mensaje (según el diagrama):

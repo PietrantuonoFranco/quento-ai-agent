@@ -8,10 +8,9 @@ def test_conf_loads_values_from_environment():
     from config import conf
 
     assert conf.MCP_SERVER_URL == "http://mcp.test"
-    assert conf.LLM_URL == "http://llm.test"
     assert conf.MCP_API_KEY == "test-key"
     assert conf.GEMINI_API_KEY == "gemini-test-key"
-    assert conf.GEMINI_MODEL == "gemini-2.5-flash"
+    assert conf.GEMINI_MODEL == "gemini-3.6-flash"
 
 
 def test_settings_ignores_extra_variables(monkeypatch):
@@ -22,7 +21,7 @@ def test_settings_ignores_extra_variables(monkeypatch):
     assert not hasattr(settings, "SOMETHING_ELSE")
 
 
-@pytest.mark.parametrize("missing", ["MCP_SERVER_URL", "LLM_URL", "MCP_API_KEY", "GEMINI_API_KEY"])
+@pytest.mark.parametrize("missing", ["MCP_SERVER_URL", "MCP_API_KEY", "GEMINI_API_KEY"])
 def test_settings_requires_mandatory_variables(monkeypatch, missing):
     monkeypatch.delenv(missing)
 
