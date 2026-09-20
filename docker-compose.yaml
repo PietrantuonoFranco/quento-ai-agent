@@ -1,4 +1,24 @@
 services:
+  mcp-host:
+    container_name: mcp-host
+    build:
+      context: ./mcp-host
+      dockerfile: Dockerfile
+    environment:
+      - LLM_URL=${LLM_URL:-http://llm:8000}
+      - MCP_SERVER_OUTLOOK_URL=${MCP_SERVER_OUTLOOK_URL:-http://mcp-server:8000/mcp}
+    ports:
+      - 8000:8000
+    networks:
+      - public-network
+      - internal-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/').read()"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: ${RESTART_POLICY:-no}
+
   db:
     image: postgres:16-alpine
     container_name: padel-quento-db
@@ -9,8 +29,17 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
+    networks:
+      - public-network
+      - internal-network
     volumes:
       - padel_quento_pgdata:/var/lib/postgresql/data
 
 volumes:
   padel_quento_pgdata:
+
+networks:
+  public-network:
+    driver: bridge
+  internal-network:
+    driver: bridge
