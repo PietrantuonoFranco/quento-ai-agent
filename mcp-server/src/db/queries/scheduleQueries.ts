@@ -44,3 +44,17 @@ export async function getAllSchedules(env: Env) {
 
   return db.select().from(schedule);
 }
+
+// Horarios de un día de la semana para todas las canchas (o una sola) en una única query.
+export async function getSchedulesByDay(env: Env, dayOfWeek: string, courtId?: number) {
+  const db = getDb(env);
+
+  return db
+    .select()
+    .from(schedule)
+    .where(
+      courtId !== undefined
+        ? and(eq(schedule.dayOfWeek, dayOfWeek), eq(schedule.courtId, courtId))
+        : eq(schedule.dayOfWeek, dayOfWeek),
+    );
+}

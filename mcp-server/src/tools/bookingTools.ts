@@ -1,15 +1,16 @@
 import {
   createBooking,
-  checkBookingAvailability,
+  getActiveBookingsInRange,
   getBookingById,
   cancelBooking,
   rescheduleBooking,
   getUpcomingBookingsByPhone,
 } from "../db/queries/bookingQueries";
+import { getOutOfServicesInRange } from "../db/queries/outOfServiceQueries";
 import { getMatchByBookingId } from "../db/queries/matchQueries";
 import { getBookerByPhoneNumber } from "../db/queries/bookerQueries";
 import { getCourtById, getAllCourts, checkCourtAvailability } from "../db/queries/courtQueries";
-import { getScheduleByCourtIdAndDay } from "../db/queries/scheduleQueries";
+import { getScheduleByCourtIdAndDay, getSchedulesByDay } from "../db/queries/scheduleQueries";
 import {
   getAvailableBookingsInputSchema,
   getAvailableTimesInputSchema,
@@ -57,46 +58,62 @@ function slotStartDate(date: string, minutesSinceMidnight: number): Date {
   return new Date(`${date}T${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00Z`);
 }
 
-// Arma la grilla fija de turnos de la cancha para ese día (bloques de
-// BOOKING_DURATION_MINUTES desde la apertura) y devuelve solo los que no
-// están creados todavía.
-async function findAvailableSlots(env: Env, courtId: number, date: string) {
-  const schedule = await getScheduleByCourtIdAndDay(env, courtId, getDayOfWeek(date));
-
-  if (!schedule) return [];
-
-  const openMinutes = timeToMinutes(schedule.openingTime);
-  const closeMinutes = timeToMinutes(schedule.closingTime);
-  const slots: string[] = [];
-  const now = nowInClubTime();
-
-  for (
-    let start = openMinutes;
-    start + BOOKING_DURATION_MINUTES <= closeMinutes;
-    start += BOOKING_DURATION_MINUTES
-  ) {
-    const slotStart = slotStartDate(date, start);
-
-    if (slotStart <= now) continue; // turnos que ya empezaron
-
-    const conflicts = await checkBookingAvailability(env, courtId, slotStart, BOOKING_DURATION_MINUTES);
-
-    if (conflicts === 0) slots.push(slotStart.toISOString());
-  }
-
-  return slots;
+function overlaps(startA: Date, endA: Date, startB: Date, endB: Date): boolean {
+  return startA < endB && endA > startB;
 }
 
-// Turnos libres por cancha para una fecha (todas las canchas disponibles, o solo una).
+// Arma la grilla fija de turnos de cada cancha para ese día (bloques de BOOKING_DURATION_MINUTES
+// desde la apertura) y devuelve solo los que siguen libres. Usa una cantidad fija de queries
+// (canchas, horarios, reservas y fuera de servicio del día) sin importar cuántas canchas o turnos haya.
 async function collectAvailability(env: Env, date: string, courtId?: number) {
   const courts = courtId
     ? [await getCourtById(env, courtId)].filter((c): c is NonNullable<typeof c> => c !== null)
     : await getAllCourts(env, CourtState.AVAILABLE);
 
+  if (courts.length === 0) return [];
+
+  const dayStart = slotStartDate(date, 0);
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60000);
+  const [schedules, bookings, outOfServices] = await Promise.all([
+    getSchedulesByDay(env, getDayOfWeek(date), courtId),
+    getActiveBookingsInRange(env, dayStart, dayEnd, courtId),
+    getOutOfServicesInRange(env, dayStart, dayEnd, courtId),
+  ]);
+  const now = nowInClubTime();
   const availability = [];
 
   for (const courtRow of courts) {
-    const slots = await findAvailableSlots(env, courtRow.id, date);
+    // Si la cancha no tiene horario cargado para ese día, se considera cerrada.
+    const schedule = schedules.find((s) => s.courtId === courtRow.id);
+
+    if (!schedule) continue;
+
+    const busy = [
+      ...bookings
+        .filter((b) => b.courtId === courtRow.id)
+        .map((b) => ({ from: b.datetime, to: new Date(b.datetime.getTime() + b.durationMinutes * 60000) })),
+      ...outOfServices
+        .filter((o) => o.courtId === courtRow.id)
+        .map((o) => ({ from: o.fromDatetime, to: o.toDatetime })),
+    ];
+
+    const openMinutes = timeToMinutes(schedule.openingTime);
+    const closeMinutes = timeToMinutes(schedule.closingTime);
+    const slots: string[] = [];
+
+    for (
+      let start = openMinutes;
+      start + BOOKING_DURATION_MINUTES <= closeMinutes;
+      start += BOOKING_DURATION_MINUTES
+    ) {
+      const slotStart = slotStartDate(date, start);
+      const slotEnd = new Date(slotStart.getTime() + BOOKING_DURATION_MINUTES * 60000);
+
+      if (slotStart <= now) continue; // turnos que ya empezaron
+      if (busy.some((b) => overlaps(slotStart, slotEnd, b.from, b.to))) continue;
+
+      slots.push(slotStart.toISOString());
+    }
 
     if (slots.length > 0) {
       availability.push({ courtId: courtRow.id, courtNumber: courtRow.number, slots });

@@ -1,7 +1,7 @@
 import { WebStandardStreamableHTTPServerTransport } from
   "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 
-import { mcpServer, registerTools } from "./server";
+import { createMcpServer } from "./server";
 import type Env from "./lib/interfaces/EnvInterface";
 
 export default {
@@ -29,8 +29,7 @@ export default {
         return new Response("Invalid API key", { status: 403 });
       }
 
-      // ✅ REGISTRAR TOOLS CON CONTEXTO
-      registerTools(env);
+      const mcpServer = createMcpServer(env);
 
       const transport = new WebStandardStreamableHTTPServerTransport({
         enableJsonResponse: true,

@@ -2,23 +2,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getAllTools } from "./tools";
 
 import type Env from "./lib/interfaces/EnvInterface";
+import type Tool from "./lib/interfaces/ToolInterface";
 
-// MCP server with the listProducts tool registered
-export const mcpServer = new McpServer({
-  name: "quento-mcp-server",
-  version: "1.0.0",
-});
-
-
-interface Tool {
-  name: string;
-  description: string;
-  inputSchema: any;
-  execute: (input: any) => Promise<any>;
-}
-
-function registerOneTool(tool: Tool) {
-  mcpServer.registerTool(
+function registerOneTool(server: McpServer, tool: Tool) {
+  server.registerTool(
     tool.name,
     {
       description: tool.description,
@@ -38,11 +25,15 @@ function registerOneTool(tool: Tool) {
   );
 }
 
-let toolsRegistered = false;
+// Un McpServer solo admite un transporte a la vez, así que se crea uno por request
+// (con las tools ligadas al env de esa request) para poder atender requests concurrentes.
+export function createMcpServer(env: Env): McpServer {
+  const server = new McpServer({
+    name: "quento-mcp-server",
+    version: "1.0.0",
+  });
 
-export function registerTools(env: Env) {
-  if (toolsRegistered) return;
+  getAllTools(env).forEach((tool) => registerOneTool(server, tool));
 
-  getAllTools(env).forEach(registerOneTool);
-  toolsRegistered = true;
+  return server;
 }

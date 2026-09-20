@@ -101,3 +101,20 @@ export async function updateBookingState(env: Env, id: number, bookingState: str
 
   return result[0] || null;
 }
+
+// Reservas no canceladas que se solapan con [from, to), de todas las canchas o de una sola.
+export async function getActiveBookingsInRange(env: Env, from: Date, to: Date, courtId?: number) {
+  const db = getDb(env);
+
+  return db
+    .select()
+    .from(booking)
+    .where(
+      and(
+        ...(courtId !== undefined ? [eq(booking.courtId, courtId)] : []),
+        ne(booking.bookingState, BookingState.CANCELLED),
+        sql`${booking.datetime} < ${to.toISOString()}::timestamp`,
+        sql`${booking.datetime} + (${booking.durationMinutes} || ' minutes')::interval > ${from.toISOString()}::timestamp`,
+      ),
+    );
+}

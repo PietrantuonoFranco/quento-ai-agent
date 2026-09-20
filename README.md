@@ -46,7 +46,7 @@ Los horarios de reservas y partidos se guardan como **hora de pared del club** e
 
 | Tool | Descripción |
 |---|---|
-| `get_available_bookings` | Turnos libres para una fecha (`date`, `YYYY-MM-DD`; **si se omite, hoy**) y opcionalmente una cancha (`courtId`) |
+| `get_available_bookings` | Turnos libres (descuenta reservas y períodos fuera de servicio) para una fecha (`date`, `YYYY-MM-DD`; **si se omite, hoy**) y opcionalmente una cancha (`courtId`) |
 | `get_available_times` | Horarios de inicio (`HH:MM`) con al menos una cancha libre en una fecha (hoy por defecto); cada horario aparece una sola vez aunque haya varias canchas |
 | `check_time_availability` | Consulta un horario puntual (`time`, `HH:MM`, y `date` opcional): indica si está disponible y qué canchas están libres; si no, devuelve los horarios alternativos del día |
 | `get_my_bookings` / `get_booking_details` | Reservas futuras de un teléfono / detalle de una reserva (cancha, hora, estado, partido); solo para su dueño |
@@ -71,7 +71,7 @@ Los horarios de reservas y partidos se guardan como **hora de pared del club** e
 └── mcp-server/                 # Servidor MCP (Cloudflare Worker) + acceso a datos
     ├── src/
     │   ├── index.ts           # Entry point del Worker (fetch handler, auth, MCP transport)
-    │   ├── server.ts          # Definición del McpServer y registro de tools
+    │   ├── server.ts          # Fábrica del McpServer (uno por request) con sus tools registradas
     │   ├── tools/             # Tools MCP agrupadas por dominio (bookings, courts, matches, booker)
     │   ├── db/
     │   │   ├── schemas/       # Esquema Drizzle (fuente de verdad del DER)

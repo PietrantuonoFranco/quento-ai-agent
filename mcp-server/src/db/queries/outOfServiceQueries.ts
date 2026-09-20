@@ -47,3 +47,19 @@ export async function cancelBookingsAffectedByOutOfService(env: Env, outOfServic
     )
     .returning();
 }
+
+// Períodos fuera de servicio que se solapan con [from, to), de todas las canchas o de una sola.
+export async function getOutOfServicesInRange(env: Env, from: Date, to: Date, courtId?: number) {
+  const db = getDb(env);
+
+  return db
+    .select()
+    .from(outOfService)
+    .where(
+      and(
+        ...(courtId !== undefined ? [eq(outOfService.courtId, courtId)] : []),
+        sql`${outOfService.fromDatetime} < ${to.toISOString()}::timestamp`,
+        sql`${outOfService.toDatetime} > ${from.toISOString()}::timestamp`,
+      ),
+    );
+}
