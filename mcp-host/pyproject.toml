@@ -1,13 +1,15 @@
 [project]
-name = "mcp-client"
+name = "mcp-host"
 version = "0.1.0"
-description = "Add your description here"
+description = "MCP Host for Quento AI Agent"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.141.1",
+    "google-genai>=2.24.0",
     "mcp[cli]>=2.2.0",
     "pydantic-settings>=2.15.0",
+    "tzdata>=2026.4",
     "uvicorn>=0.53.0",
 ]
 
