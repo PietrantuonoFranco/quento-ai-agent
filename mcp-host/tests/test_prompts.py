@@ -44,3 +44,10 @@ def test_keeps_the_key_rules():
     assert "confirmación explícita" in prompt
     assert "is_booker_registered" in prompt
     assert "nunca se lo pidas" in prompt
+
+
+def test_says_open_matches_are_out_of_scope():
+    prompt = build_system_prompt(now=NOW)
+
+    assert "No gestionás partidos abiertos" in prompt
+    assert "ver partidos abiertos" not in prompt

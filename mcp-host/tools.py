@@ -10,11 +10,10 @@ from mcp import types as mcp_types
 # somebody else's bookings.
 PHONE_FIELDS = frozenset({"phoneNumber", "bookerPhoneNumber"})
 
-# Tools kept away from the model on purpose.
-# join_match / leave_match take a `playerId`, and no tool maps a phone number to one, so the
-# model would have to guess ids (and could enrol anyone). Re-enable once the server resolves
-# the player from the phone number.
-HIDDEN_TOOLS = frozenset({"join_match", "leave_match"})
+# Tools the server exposes but the agent doesn't use: it only handles bookings and questions
+# about the club, so open matches are out of its scope. (Also, join_match / leave_match take a
+# `playerId` that no tool maps from a phone number.)
+HIDDEN_TOOLS = frozenset({"get_open_matches", "create_match_from_booking", "join_match", "leave_match"})
 
 
 def visible_tools(tools: list[mcp_types.Tool]) -> list[mcp_types.Tool]:

@@ -1,6 +1,6 @@
 # Roadmap: agente de WhatsApp
 
-Objetivo: un agente que atienda clientes por WhatsApp y les permita reservar o cancelar turnos, unirse o salir de partidos abiertos y consultar información del club, usando Gemini y el MCP server existente.
+Objetivo: un agente que atienda clientes por WhatsApp y les permita consultar horarios, reservar, ver, reprogramar o cancelar turnos y hacer preguntas sobre el club. Los partidos abiertos quedan fuera del alcance del agente, usando Gemini y el MCP server existente.
 
 ## Arquitectura
 
@@ -20,9 +20,10 @@ WhatsApp (Meta Cloud API) ──webhook──▶ mcp-host (FastAPI)
 
 - **El teléfono lo inyecta el host, no el modelo.** El número real viene del webhook. Se sobreescribe `phoneNumber` en los argumentos antes de llamar al MCP (mejor aún: se quita del schema que ve Gemini). Así el LLM no puede operar sobre reservas de otra persona.
 - **Confirmación explícita** del cliente antes de `create_booking`, `cancel_booking` y `reschedule_booking`.
-- **Registro perezoso:** el booker se busca o crea recién cuando el cliente confirma que quiere reservar, no al empezar la conversación. Las consultas (horarios, info del club, partidos abiertos) no lo necesitan. En ese momento el agente llama a `is_booker_registered`; si da `false`, pide nombre y apellido, llama a `register_booker` y recién entonces `create_booking`. Evita pedir datos a quien solo consulta y no crea bookers innecesarios. A verificar: `join_match` y `leave_match` usan `playerId`, así que unirse a un partido puede requerir registro también.
+- **Registro perezoso:** el booker se busca o crea recién cuando el cliente confirma que quiere reservar, no al empezar la conversación. Las consultas (horarios, info del club) no lo necesitan. En ese momento el agente llama a `is_booker_registered`; si da `false`, pide nombre y apellido, llama a `register_booker` y recién entonces `create_booking`. Evita pedir datos a quien solo consulta y no crea bookers innecesarios.
 - **Nombre del usuario:** WhatsApp solo entrega `wa_id` (el teléfono) y `profile.name` (nombre de perfil, texto libre que puede ser un apodo, un emoji o faltar). No hay forma de obtener nombre y apellido reales por la API. El host pasa `profile.name` al agente como contexto y como sugerencia ("¿Te registro como Fran? Pasame también tu apellido"). El nombre y apellido definitivos se piden en la conversación, solo la primera vez, y el LLM los extrae de la respuesta libre para llamar a `register_booker`.
 - **Modelo:** `gemini-3.6-flash` por defecto (configurable con `GEMINI_MODEL`). Si responde 503 por demanda, el SDK reintenta con backoff y, si sigue fallando, el agente contesta con un mensaje de disculpas sin romper la conversación. El free tier tiene límites de rate para producción.
+- **Alcance:** el agente solo atiende turnos y responde preguntas. Las tools de partidos abiertos (`get_open_matches`, `create_match_from_booking`, `join_match`, `leave_match`) siguen en el server pero el host no se las muestra al modelo (`HIDDEN_TOOLS` en `tools.py`).
 - **Sin frameworks de orquestación al inicio:** loop propio con el SDK `google-genai` (ver "Preguntas abiertas").
 
 ## Fases
@@ -48,7 +49,6 @@ WhatsApp (Meta Cloud API) ──webhook──▶ mcp-host (FastAPI)
 - [x] `chat.py`: chat por consola (`uv run python chat.py`).
 - [x] Tests con mocks (55 en total en `mcp-host`).
 - [ ] **Probar con Gemini real** y afinar el prompt (hace falta `GEMINI_API_KEY` en `mcp-host/.env`).
-- [ ] **Bloqueado en el server:** `join_match` / `leave_match` reciben un `playerId` y ninguna tool lo obtiene a partir del teléfono, además `join_match` no valida cupo, estado del partido ni duplicados. Por eso el agente las tiene ocultas (`HIDDEN_TOOLS` en `tools.py`). Hay que cambiarlas en `mcp-server` para que resuelvan el jugador por teléfono y validen.
 
 ### Fase 3 · WhatsApp y memoria
 - [ ] `GET /webhook`: verificación de Meta.
@@ -62,7 +62,7 @@ WhatsApp (Meta Cloud API) ──webhook──▶ mcp-host (FastAPI)
 
 ### Fase 4 · Calidad y deploy
 - [ ] Tests del agente mockeando Gemini y el MCP.
-- [ ] Casos de prueba de conversaciones completas (reservar, cancelar, unirse a partido).
+- [ ] Casos de prueba de conversaciones completas (consultar horarios, reservar, reprogramar, cancelar).
 - [ ] Deploy del host (Cloud Run, Fly o Railway) con HTTPS público.
 - [ ] Configurar el webhook en Meta con el número de prueba.
 - [ ] Logging por conversación y manejo de errores del LLM (rate limit, timeouts).

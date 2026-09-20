@@ -26,9 +26,9 @@ TOOLS = [
         },
     ),
     mcp_types.Tool(
-        name="join_match",
-        description="join",
-        input_schema={"type": "object", "properties": {"matchId": {"type": "integer"}, "playerId": {"type": "integer"}}},
+        name="get_open_matches",
+        description="matches",
+        input_schema={"type": "object", "properties": {}},
     ),
 ]
 
@@ -164,12 +164,12 @@ async def test_unexpected_tool_failures_do_not_leak_details(agent, llm, mcp):
 
 async def test_unknown_and_hidden_tools_are_not_executed(agent, llm, mcp):
     llm.generate.side_effect = [
-        tool_call(("join_match", {"matchId": 1, "playerId": 99}), ("drop_tables", {})),
+        tool_call(("get_open_matches", {}), ("drop_tables", {})),
         reply("No puedo"),
     ]
     history = []
 
-    await agent.respond(history, "anotame", PHONE)
+    await agent.respond(history, "¿hay partidos abiertos?", PHONE)
 
     mcp.call_tool.assert_not_awaited()
     assert all("error" in r.response for r in function_responses(history))

@@ -23,11 +23,14 @@ CREATE = tool(
 CLUB = tool("get_club_info")
 
 
-def test_hides_join_and_leave_match():
-    tools = [CLUB, tool("join_match"), tool("leave_match")]
+MATCH_TOOLS = ["get_open_matches", "create_match_from_booking", "join_match", "leave_match"]
+
+
+def test_hides_every_open_match_tool():
+    tools = [CLUB, *(tool(name) for name in MATCH_TOOLS)]
 
     assert [t.name for t in visible_tools(tools)] == ["get_club_info"]
-    assert {"join_match", "leave_match"} == HIDDEN_TOOLS
+    assert set(MATCH_TOOLS) == HIDDEN_TOOLS
 
 
 def test_declarations_keep_name_and_description():
@@ -64,7 +67,7 @@ def test_declarations_strip_the_schema_keyword_and_do_not_mutate_the_tool():
 
 
 def test_declarations_skip_hidden_tools():
-    assert to_function_declarations([tool("join_match", {"playerId": {"type": "integer"}})]) == []
+    assert to_function_declarations([tool(name) for name in MATCH_TOOLS]) == []
 
 
 def test_inject_phone_sets_the_real_number():
