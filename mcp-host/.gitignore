@@ -1,0 +1,18 @@
+# gitignore template for LangChain products, e.g., LangGraph, LangSmith
+# website: https://www.langchain.com/
+# website: https://www.langchain.com/langgraph
+
+# Virtual environment
+*\venv
+
+# Byte-compiled / optimized / DLL files
+__pycache__
+*.py[cod]
+*$py.class
+
+# Secret files
+*.env
+*.secret
+
+# Pytest cache
+.pytest_cache/
