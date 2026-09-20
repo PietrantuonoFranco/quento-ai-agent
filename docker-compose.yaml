@@ -6,7 +6,8 @@ services:
       dockerfile: Dockerfile
     environment:
       - LLM_URL=${LLM_URL:-http://llm:8000}
-      - MCP_SERVER_OUTLOOK_URL=${MCP_SERVER_OUTLOOK_URL:-http://mcp-server:8000/mcp}
+      - MCP_SERVER_URL=${MCP_SERVER_URL:-http://mcp-server:8000}
+      - MCP_API_KEY=${MCP_API_KEY:-}
     ports:
       - 8000:8000
     networks:
