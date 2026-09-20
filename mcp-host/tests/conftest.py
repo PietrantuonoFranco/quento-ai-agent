@@ -4,3 +4,4 @@ import os
 # (y las del entorno pisan a las de mcp-host/.env, así los tests no dependen de él).
 os.environ["MCP_SERVER_URL"] = "http://mcp.test"
 os.environ["LLM_URL"] = "http://llm.test"
+os.environ["MCP_API_KEY"] = "test-key"

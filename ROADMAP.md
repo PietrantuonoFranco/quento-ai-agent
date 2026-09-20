@@ -27,12 +27,14 @@ WhatsApp (Meta Cloud API) ──webhook──▶ mcp-host (FastAPI)
 
 ## Fases
 
-### Fase 1 · Cliente MCP
-- [ ] Agregar `MCP_API_KEY` a `config.py` y `.env.example`.
-- [ ] Enviar el header `x-api-key` en `client.py` (hoy el server respondería 401).
-- [ ] Agregar `list_tools()` al cliente.
-- [ ] Reutilizar la sesión MCP (hoy se abre una conexión por cada tool call).
-- [ ] Tests con pytest.
+### Fase 1 · Cliente MCP ✅
+- [x] Agregar `MCP_API_KEY` a `config.py` y `.env.example`.
+- [x] Enviar el header `x-api-key` en `client.py`.
+- [x] Agregar `list_tools()` al cliente.
+- [x] Reutilizar la sesión MCP (una sola conexión, se reabre y reintenta una vez si se cae).
+- [x] Los errores de las tools (`isError`) se lanzan como `ToolError` con el mensaje del server.
+- [x] Conexión abierta/cerrada en el `lifespan` de FastAPI.
+- [x] Tests con pytest (25) y prueba manual contra el server real (17 tools, errores, 20 llamadas concurrentes).
 
 ### Fase 2 · Agente con Gemini (por consola)
 - [ ] Agregar la dependencia `google-genai` y `GEMINI_API_KEY` a la config.

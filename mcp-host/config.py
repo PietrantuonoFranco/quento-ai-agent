@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     # Configurations for the MCP Host
     LLM_URL: str = Field(..., validation_alias="LLM_URL")
     MCP_SERVER_URL: str = Field(..., validation_alias="MCP_SERVER_URL")
+    MCP_API_KEY: str = Field(..., validation_alias="MCP_API_KEY")
 
 
 conf = Settings()
