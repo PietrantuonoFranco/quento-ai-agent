@@ -37,16 +37,18 @@ WhatsApp (Meta Cloud API) ──webhook──▶ mcp-host (FastAPI)
 - [x] Tests con pytest (25) y prueba manual contra el server real (17 tools, errores, 20 llamadas concurrentes).
 
 ### Fase 2 · Agente con Gemini (por consola)
-- [ ] Agregar la dependencia `google-genai` y `GEMINI_API_KEY` a la config.
-- [ ] Puente MCP → Gemini: convertir el schema de las 17 tools a `FunctionDeclaration`.
-- [ ] `agent.py`: loop de function calling con límite de 5 a 8 iteraciones.
-- [ ] Devolver los errores de las tools (`isError`) al modelo para que los explique.
-- [ ] Inyección de `phoneNumber` desde el host.
-- [ ] Pasar `profile.name` de WhatsApp al agente como contexto (puede venir vacío).
-- [ ] Flujo de registro perezoso: al confirmar la reserva, chequear `is_booker_registered`; si no está registrado, pedir nombre y apellido (sugiriendo `profile.name`), llamar a `register_booker` con los campos extraídos y luego `create_booking`.
-- [ ] Verificar qué necesita `join_match` / `leave_match` (`playerId`) y si requiere registro previo.
-- [ ] `prompts.py`: español rioplatense, tono breve, sin precios, nunca inventar horarios, cuándo usar cada tool.
-- [ ] Script de chat por consola para iterar el prompt sin depender de WhatsApp.
+- [x] Agregar la dependencia `google-genai` y `GEMINI_API_KEY` / `GEMINI_MODEL` a la config.
+- [x] Puente MCP → Gemini (`tools.py`): las tools del server se convierten a `FunctionDeclaration` sin escribirlas a mano.
+- [x] `agent.py`: loop de function calling con límite de 8 iteraciones, llamadas en paralelo y respuesta de respaldo si Gemini no devuelve nada.
+- [x] Los errores de las tools se devuelven al modelo para que los explique (los inesperados, sin detalles internos).
+- [x] Inyección de `phoneNumber` / `bookerPhoneNumber` desde el host: se quitan del schema que ve Gemini y se pisan al llamar.
+- [x] `profile.name` como contexto en el prompt (aplanado y truncado, porque lo escribe el usuario).
+- [x] Flujo de registro perezoso descrito en el prompt.
+- [x] `prompts.py`: español rioplatense, tono breve, sin precios, fecha y hora actuales del club.
+- [x] `chat.py`: chat por consola (`uv run python chat.py`).
+- [x] Tests con mocks (55 en total en `mcp-host`).
+- [ ] **Probar con Gemini real** y afinar el prompt (hace falta `GEMINI_API_KEY` en `mcp-host/.env`).
+- [ ] **Bloqueado en el server:** `join_match` / `leave_match` reciben un `playerId` y ninguna tool lo obtiene a partir del teléfono, además `join_match` no valida cupo, estado del partido ni duplicados. Por eso el agente las tiene ocultas (`HIDDEN_TOOLS` en `tools.py`). Hay que cambiarlas en `mcp-server` para que resuelvan el jugador por teléfono y validen.
 
 ### Fase 3 · WhatsApp y memoria
 - [ ] `GET /webhook`: verificación de Meta.

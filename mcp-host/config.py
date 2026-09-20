@@ -15,5 +15,9 @@ class Settings(BaseSettings):
     MCP_SERVER_URL: str = Field(..., validation_alias="MCP_SERVER_URL")
     MCP_API_KEY: str = Field(..., validation_alias="MCP_API_KEY")
 
+    # Gemini
+    GEMINI_API_KEY: str = Field(..., validation_alias="GEMINI_API_KEY")
+    GEMINI_MODEL: str = Field("gemini-2.5-flash", validation_alias="GEMINI_MODEL")
+
 
 conf = Settings()
