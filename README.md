@@ -40,7 +40,7 @@ El esquema vive como código en `mcp-server/src/db/schemas/*.ts` (Drizzle ORM), 
 
 ### Convención de fechas
 
-Los horarios de reservas y partidos se guardan como **hora de pared del club** en columnas `timestamp` sin zona horaria, y las tools los devuelven como ISO con sufijo `Z` que representa esa hora local (por ejemplo `2026-09-19T15:00:00.000Z` = 15:00 en el club). Cuando una tool necesita saber "hoy" usa la zona `America/Argentina/Buenos_Aires` (`CLUB_TIMEZONE` en `mcp-server/src/lib/constants.ts`). Los turnos duran 90 minutos (`BOOKING_DURATION_MINUTES`) y forman una grilla fija desde la apertura de cada cancha.
+Los horarios de reservas y partidos se guardan como **hora de pared del club** en columnas `timestamp` sin zona horaria, y las tools los devuelven como ISO con sufijo `Z` que representa esa hora local (por ejemplo `2026-09-19T15:00:00.000Z` = 15:00 en el club). Cuando una tool necesita saber "hoy" usa la zona `America/Argentina/Buenos_Aires` (`CLUB_TIMEZONE` en `mcp-server/src/lib/constants.ts`). Los turnos que ya empezaron no se ofrecen ni se pueden reservar. Los turnos duran 90 minutos (`BOOKING_DURATION_MINUTES`) y forman una grilla fija desde la apertura de cada cancha.
 
 ### Tools del MCP Server
 
@@ -49,10 +49,14 @@ Los horarios de reservas y partidos se guardan como **hora de pared del club** e
 | `get_available_bookings` | Turnos libres para una fecha (`date`, `YYYY-MM-DD`; **si se omite, hoy**) y opcionalmente una cancha (`courtId`) |
 | `get_available_times` | Horarios de inicio (`HH:MM`) con al menos una cancha libre en una fecha (hoy por defecto); cada horario aparece una sola vez aunque haya varias canchas |
 | `check_time_availability` | Consulta un horario puntual (`time`, `HH:MM`, y `date` opcional): indica si está disponible y qué canchas están libres; si no, devuelve los horarios alternativos del día |
-| `create_booking` | Reserva un turno para un booker registrado (`courtId`, `bookerPhoneNumber`, `datetime`); valida grilla y disponibilidad |
+| `get_my_bookings` / `get_booking_details` | Reservas futuras de un teléfono / detalle de una reserva (cancha, hora, estado, partido); solo para su dueño |
+| `cancel_booking` / `reschedule_booking` | Cancela o mueve a otro horario (y opcionalmente otra cancha) una reserva futura; validan que el teléfono sea el dueño y que el turno nuevo esté libre |
+| `get_club_info` | Cantidad de canchas por estado, horarios de apertura por día, duración del turno y zona horaria (no incluye precios ni política de cancelación) |
+| `create_booking` | Reserva un turno futuro para un booker registrado (`courtId`, `bookerPhoneNumber`, `datetime`); valida grilla y disponibilidad |
 | `is_booker_registered` / `register_booker` | Consulta / alta de quien reserva, identificado por teléfono |
 | `list_courts` / `get_court_status` | Canchas (filtrables por estado) y estado de una cancha puntual |
 | `get_open_matches` | Partidos que buscan jugadores, filtrables por fecha, cancha o categoría |
+| `create_match_from_booking` | Convierte una reserva futura en un partido abierto que busca jugadores (pasa la reserva a `pending_players`) |
 | `join_match` / `leave_match` | Sumar o quitar a un jugador de un partido |
 
 ### Estructura del repo

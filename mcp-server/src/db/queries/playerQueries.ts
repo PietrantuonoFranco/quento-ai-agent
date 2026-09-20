@@ -23,3 +23,10 @@ export async function createPlayer(env: Env, values: typeof player.$inferInsert)
 
   return result[0];
 }
+
+export async function getPlayerByBookerId(env: Env, bookerId: number) {
+  const db = getDb(env);
+  const result = await db.select().from(player).where(eq(player.bookerId, bookerId)).limit(1);
+
+  return result[0] || null;
+}

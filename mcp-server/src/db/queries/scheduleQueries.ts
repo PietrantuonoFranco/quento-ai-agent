@@ -38,3 +38,9 @@ export async function getScheduleByCourtIdAndDay(env: Env, courtId: number, dayO
 export function isWithinOpeningHours(schedule: { openingTime: string; closingTime: string }, time: string) {
   return time >= schedule.openingTime && time <= schedule.closingTime;
 }
+
+export async function getAllSchedules(env: Env) {
+  const db = getDb(env);
+
+  return db.select().from(schedule);
+}

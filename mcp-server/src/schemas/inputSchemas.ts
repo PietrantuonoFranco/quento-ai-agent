@@ -49,6 +49,62 @@ export const checkTimeAvailabilityInputSchema = z.object({
     .describe("Start time to check (HH:MM, 24h, club local time)"),
 });
 
+const bookingIdSchema = z.number().int().positive().describe("The booking ID");
+const ownerPhoneSchema = z.string().describe("Phone number of the booker who owns the booking (must match)");
+
+/**
+ * Listar las reservas futuras de un booker.
+ */
+export const getMyBookingsInputSchema = z.object({
+  phoneNumber: z.string().describe("The booker's phone number"),
+});
+
+/**
+ * Detalle de una reserva (solo para su dueño).
+ */
+export const getBookingDetailsInputSchema = z.object({
+  bookingId: bookingIdSchema,
+  phoneNumber: ownerPhoneSchema,
+});
+
+/**
+ * Cancelar una reserva futura (solo su dueño).
+ */
+export const cancelBookingInputSchema = z.object({
+  bookingId: bookingIdSchema,
+  phoneNumber: ownerPhoneSchema,
+});
+
+/**
+ * Mover una reserva a otro horario (y opcionalmente otra cancha).
+ */
+export const rescheduleBookingInputSchema = z.object({
+  bookingId: bookingIdSchema,
+  phoneNumber: ownerPhoneSchema,
+  newDatetime: z
+    .string()
+    .describe("ISO datetime for the new start; must match one of the court's fixed slot start times"),
+  courtId: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("Court for the new slot; defaults to the booking's current court"),
+});
+
+/**
+ * Información general del club.
+ */
+export const getClubInfoInputSchema = z.object({});
+
+/**
+ * Convertir una reserva en un partido abierto que busca jugadores.
+ */
+export const createMatchFromBookingInputSchema = z.object({
+  bookingId: bookingIdSchema,
+  phoneNumber: ownerPhoneSchema,
+});
+
 /**
  * Saber si un booker ya está registrado, a partir de su número de teléfono.
  */

@@ -1,6 +1,7 @@
 import { getBookingTools } from "./bookingTools";
 import { getBookerTools } from "./bookerTools";
 import { getCourtTools } from "./courtTools";
+import { getClubTools } from "./clubTools";
 import { getMatchTools } from "./matchTools";
 import type Env from "../lib/interfaces/EnvInterface";
 import type Tool from "../lib/interfaces/ToolInterface";
@@ -11,5 +12,6 @@ export function getAllTools(env: Env): Tool[] {
     ...getBookerTools(env),
     ...getCourtTools(env),
     ...getMatchTools(env),
+    ...getClubTools(env),
   ];
 }

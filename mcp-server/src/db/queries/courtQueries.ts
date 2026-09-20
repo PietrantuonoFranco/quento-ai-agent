@@ -59,7 +59,13 @@ export async function unblockCourt(env: Env, id: number) {
 }
 
 // Cuenta conflictos (fuera de servicio + reservas solapadas) para el rango pedido; 0 = disponible.
-export async function checkCourtAvailability(env: Env, courtId: number, datetime: Date, durationMinutes: number) {
+export async function checkCourtAvailability(
+  env: Env,
+  courtId: number,
+  datetime: Date,
+  durationMinutes: number,
+  excludeBookingId?: number,
+) {
   const db = getDb(env);
   const courtRow = await getCourtById(env, courtId);
 
@@ -78,7 +84,7 @@ export async function checkCourtAvailability(env: Env, courtId: number, datetime
       ),
     );
 
-  const conflictingBookings = await checkBookingAvailability(env, courtId, datetime, durationMinutes);
+  const conflictingBookings = await checkBookingAvailability(env, courtId, datetime, durationMinutes, excludeBookingId);
 
   return activeOutOfService.length + conflictingBookings;
 }

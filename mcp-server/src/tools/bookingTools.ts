@@ -1,4 +1,12 @@
-import { createBooking, checkBookingAvailability } from "../db/queries/bookingQueries";
+import {
+  createBooking,
+  checkBookingAvailability,
+  getBookingById,
+  cancelBooking,
+  rescheduleBooking,
+  getUpcomingBookingsByPhone,
+} from "../db/queries/bookingQueries";
+import { getMatchByBookingId } from "../db/queries/matchQueries";
 import { getBookerByPhoneNumber } from "../db/queries/bookerQueries";
 import { getCourtById, getAllCourts, checkCourtAvailability } from "../db/queries/courtQueries";
 import { getScheduleByCourtIdAndDay } from "../db/queries/scheduleQueries";
@@ -6,12 +14,17 @@ import {
   getAvailableBookingsInputSchema,
   getAvailableTimesInputSchema,
   checkTimeAvailabilityInputSchema,
+  getMyBookingsInputSchema,
+  getBookingDetailsInputSchema,
+  cancelBookingInputSchema,
+  rescheduleBookingInputSchema,
   createBookingInputSchema,
 } from "../schemas/inputSchemas";
 import BookingState from "../lib/enums/bookingState";
 import CourtState from "../lib/enums/courtState";
 import DayOfWeek from "../lib/enums/dayOfWeek";
-import { BOOKING_DURATION_MINUTES, CLUB_TIMEZONE } from "../lib/constants";
+import { BOOKING_DURATION_MINUTES } from "../lib/constants";
+import { todayInClubTimezone, nowInClubTime } from "../lib/clubTime";
 import type Env from "../lib/interfaces/EnvInterface";
 import type Tool from "../lib/interfaces/ToolInterface";
 
@@ -29,11 +42,6 @@ const WEEKDAYS = [
 // todas las fechas se arman y leen en UTC para que no dependan de la zona horaria del servidor.
 function getDayOfWeek(date: string): DayOfWeek {
   return WEEKDAYS[new Date(`${date}T00:00:00Z`).getUTCDay()];
-}
-
-// Fecha de hoy (YYYY-MM-DD) en la zona horaria del club.
-function todayInClubTimezone(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: CLUB_TIMEZONE });
 }
 
 function timeToMinutes(time: string): number {
@@ -60,6 +68,7 @@ async function findAvailableSlots(env: Env, courtId: number, date: string) {
   const openMinutes = timeToMinutes(schedule.openingTime);
   const closeMinutes = timeToMinutes(schedule.closingTime);
   const slots: string[] = [];
+  const now = nowInClubTime();
 
   for (
     let start = openMinutes;
@@ -67,6 +76,9 @@ async function findAvailableSlots(env: Env, courtId: number, date: string) {
     start += BOOKING_DURATION_MINUTES
   ) {
     const slotStart = slotStartDate(date, start);
+
+    if (slotStart <= now) continue; // turnos que ya empezaron
+
     const conflicts = await checkBookingAvailability(env, courtId, slotStart, BOOKING_DURATION_MINUTES);
 
     if (conflicts === 0) slots.push(slotStart.toISOString());
@@ -97,6 +109,34 @@ async function collectAvailability(env: Env, date: string, courtId?: number) {
 // "2026-09-19T13:00:00.000Z" -> "13:00"
 function slotToTime(slot: string): string {
   return slot.slice(11, 16);
+}
+
+function parseClubDatetime(value: string): Date {
+  // El horario es hora de pared del club: si no trae zona horaria se interpreta como tal (UTC nominal).
+  const datetime = new Date(/(Z|[+-]\d{2}:?\d{2})$/i.test(value) ? value : `${value}Z`);
+
+  if (Number.isNaN(datetime.getTime())) {
+    throw new Error("The requested datetime is not a valid ISO datetime");
+  }
+
+  return datetime;
+}
+
+// Devuelve la reserva si existe y pertenece a ese teléfono; si no, falla con el mismo mensaje
+// para no revelar reservas de otras personas.
+async function getOwnedBooking(env: Env, bookingId: number, phoneNumber: string) {
+  const bookingRow = await getBookingById(env, bookingId);
+
+  if (!bookingRow || bookingRow.bookerPhoneNumber !== phoneNumber) {
+    throw new Error("Booking not found for this phone number");
+  }
+
+  return bookingRow;
+}
+
+function assertModifiable(bookingRow: { bookingState: string; datetime: Date }) {
+  if (bookingRow.bookingState === BookingState.CANCELLED) throw new Error("The booking is already cancelled");
+  if (bookingRow.datetime <= nowInClubTime()) throw new Error("The booking has already started or passed");
 }
 
 // Un turno solo es válido si arranca justo en uno de los bloques de la
@@ -173,11 +213,10 @@ export function getBookingTools(env: Env): Tool[] {
           throw new Error("The booker is not registered yet");
         }
 
-        // El horario es hora de pared del club: si no trae zona horaria se interpreta como tal (UTC nominal).
-        const datetime = new Date(/(Z|[+-]\d{2}:?\d{2})$/i.test(input.datetime) ? input.datetime : `${input.datetime}Z`);
+        const datetime = parseClubDatetime(input.datetime);
 
-        if (Number.isNaN(datetime.getTime())) {
-          throw new Error("The requested datetime is not a valid ISO datetime");
+        if (datetime <= nowInClubTime()) {
+          throw new Error("The requested time is in the past");
         }
 
         if (!(await isValidSlotStart(env, input.courtId, datetime))) {
@@ -197,6 +236,95 @@ export function getBookingTools(env: Env): Tool[] {
           durationMinutes: BOOKING_DURATION_MINUTES,
           bookingState: BookingState.RESERVED,
         });
+      },
+    },
+    {
+      name: "get_my_bookings",
+      description: "Lists the upcoming (not cancelled) bookings of a booker, identified by phone number",
+      inputSchema: getMyBookingsInputSchema,
+      execute: async (input) => {
+        const bookings = await getUpcomingBookingsByPhone(env, input.phoneNumber, nowInClubTime());
+        const courts = await getAllCourts(env);
+
+        return bookings.map((b) => ({
+          bookingId: b.id,
+          courtId: b.courtId,
+          courtNumber: courts.find((c) => c.id === b.courtId)?.number,
+          datetime: b.datetime.toISOString(),
+          durationMinutes: b.durationMinutes,
+          bookingState: b.bookingState,
+        }));
+      },
+    },
+    {
+      name: "get_booking_details",
+      description: "Returns the details of one booking (court, time, state and match info) for its owner",
+      inputSchema: getBookingDetailsInputSchema,
+      execute: async (input) => {
+        const bookingRow = await getOwnedBooking(env, input.bookingId, input.phoneNumber);
+        const courtRow = await getCourtById(env, bookingRow.courtId);
+        const matchRow = await getMatchByBookingId(env, bookingRow.id);
+
+        return {
+          bookingId: bookingRow.id,
+          courtId: bookingRow.courtId,
+          courtNumber: courtRow?.number,
+          datetime: bookingRow.datetime.toISOString(),
+          durationMinutes: bookingRow.durationMinutes,
+          bookingState: bookingRow.bookingState,
+          match: matchRow ? { matchId: matchRow.id, needPlayers: matchRow.needPlayers } : null,
+        };
+      },
+    },
+    {
+      name: "cancel_booking",
+      description: "Cancels an upcoming booking; only its owner (matching phone number) can cancel it",
+      inputSchema: cancelBookingInputSchema,
+      execute: async (input) => {
+        const bookingRow = await getOwnedBooking(env, input.bookingId, input.phoneNumber);
+
+        assertModifiable(bookingRow);
+
+        const cancelled = await cancelBooking(env, bookingRow.id);
+
+        return { bookingId: bookingRow.id, bookingState: cancelled?.bookingState, datetime: bookingRow.datetime.toISOString() };
+      },
+    },
+    {
+      name: "reschedule_booking",
+      description:
+        "Moves an upcoming booking to a new start time (and optionally another court) if that slot is free; only the owner can do it",
+      inputSchema: rescheduleBookingInputSchema,
+      execute: async (input) => {
+        const bookingRow = await getOwnedBooking(env, input.bookingId, input.phoneNumber);
+
+        assertModifiable(bookingRow);
+
+        const courtId = input.courtId ?? bookingRow.courtId;
+        const datetime = parseClubDatetime(input.newDatetime);
+
+        if (datetime <= nowInClubTime()) {
+          throw new Error("The requested time is in the past");
+        }
+
+        if (!(await isValidSlotStart(env, courtId, datetime))) {
+          throw new Error("The requested time does not match one of the court's fixed booking slots");
+        }
+
+        const conflicts = await checkCourtAvailability(env, courtId, datetime, bookingRow.durationMinutes, bookingRow.id);
+
+        if (conflicts > 0) {
+          throw new Error("The court is not available for the requested time slot");
+        }
+
+        const updated = await rescheduleBooking(env, bookingRow.id, courtId, datetime);
+
+        return {
+          bookingId: bookingRow.id,
+          courtId,
+          datetime: updated?.datetime.toISOString(),
+          durationMinutes: bookingRow.durationMinutes,
+        };
       },
     },
   ];
