@@ -1,6 +1,9 @@
-def main():
-    print("Hello from mcp-client!")
+from fastapi import FastAPI
 
 
-if __name__ == "__main__":
-    main()
+app = FastAPI()
+
+
+@app.get("/")
+def health() -> dict[str, str]:
+    return {"status": "ok"}
