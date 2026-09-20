@@ -8,7 +8,7 @@ Quento es un asistente conversacional para la gestión de reservas de una cancha
 
 El sistema se divide en dos componentes principales:
 
-- **MCP Client** (`mcp-client/`): corre en Railway. Recibe los mensajes entrantes desde la WhatsApp API, mantiene la conversación con el LLM y, cuando el LLM decide usar una herramienta, la invoca contra el MCP Server. También le pasa al LLM la lista de tools disponibles y los datos que las tools devuelven.
+- **MCP Client / Host** (`mcp-host/`, Python + FastAPI): corre en Railway. Hoy es un esqueleto (solo expone un health check en `/`); su rol previsto es recibir los mensajes entrantes desde la WhatsApp API, mantener la conversación con el LLM y, cuando el LLM decide usar una herramienta, invocarla contra el MCP Server. También le pasa al LLM la lista de tools disponibles y los datos que las tools devuelven. Se configura con `MCP_SERVER_URL` y `LLM_URL` (ver `mcp-host/.env.example`).
 - **MCP Server** (`mcp-server/`): corre como un **Cloudflare Worker**. Expone las herramientas de negocio (reservas, canchas, partidos, etc.) vía el protocolo MCP (Streamable HTTP) y se conecta a la base de datos PostgreSQL a través de **Cloudflare Hyperdrive** (pooling de conexiones y cacheo de queries). La base de datos en producción es un PostgreSQL gestionado en **Supabase**.
 
 Flujo de un mensaje (según el diagrama):
@@ -34,7 +34,24 @@ Entidades principales:
 - **penalties**: penalizaciones de puntaje a jugadores.
 - **chat_rooms / messages**: chats asociados a un partido.
 
-El esquema vive como código en `mcp-server/src/db/schemas/*.ts` (Drizzle ORM), que es la fuente de verdad sobre el DER.
+El esquema vive como código en `mcp-server/src/db/schemas/*.ts` (Drizzle ORM), que es la fuente de verdad sobre el DER. Las tablas se crean con las migraciones de `mcp-server/src/db/migrations/`. Los estados (`courts.court_state`, `bookings.booking_state`, `schedules.day_of_week`, etc.) son columnas `varchar` cuyos valores válidos están en `mcp-server/src/lib/enums/`.
+
+> **Base compartida con la web.** Esta misma base también la consume la web de Quento (`padel-quento`, Next.js + TypeORM). Como el esquema lo gestiona Drizzle, la web debe mapear sus entidades a estas tablas y columnas (con `synchronize: false` y sin correr sus propias migraciones de TypeORM contra esta base).
+
+### Convención de fechas
+
+Los horarios de reservas y partidos se guardan como **hora de pared del club** en columnas `timestamp` sin zona horaria, y las tools los devuelven como ISO con sufijo `Z` que representa esa hora local (por ejemplo `2026-09-19T15:00:00.000Z` = 15:00 en el club). Cuando una tool necesita saber "hoy" usa la zona `America/Argentina/Buenos_Aires` (`CLUB_TIMEZONE` en `mcp-server/src/lib/constants.ts`). Los turnos duran 90 minutos (`BOOKING_DURATION_MINUTES`) y forman una grilla fija desde la apertura de cada cancha.
+
+### Tools del MCP Server
+
+| Tool | Descripción |
+|---|---|
+| `get_available_bookings` | Turnos libres para una fecha (`date`, `YYYY-MM-DD`; **si se omite, hoy**) y opcionalmente una cancha (`courtId`) |
+| `create_booking` | Reserva un turno para un booker registrado (`courtId`, `bookerPhoneNumber`, `datetime`); valida grilla y disponibilidad |
+| `is_booker_registered` / `register_booker` | Consulta / alta de quien reserva, identificado por teléfono |
+| `list_courts` / `get_court_status` | Canchas (filtrables por estado) y estado de una cancha puntual |
+| `get_open_matches` | Partidos que buscan jugadores, filtrables por fecha, cancha o categoría |
+| `join_match` / `leave_match` | Sumar o quitar a un jugador de un partido |
 
 ### Estructura del repo
 
@@ -44,7 +61,7 @@ El esquema vive como código en `mcp-server/src/db/schemas/*.ts` (Drizzle ORM), 
 ├── docs/
 │   ├── mcp-arquitecture/     # Diagrama de arquitectura (.drawio / .jpg)
 │   └── der/                  # Diagrama entidad-relación (.drawio / .jpg)
-├── mcp-client/                # Cliente MCP (WhatsApp + LLM), desplegado en Railway
+├── mcp-host/                  # Cliente/host MCP (FastAPI, Python + uv), desplegado en Railway
 └── mcp-server/                 # Servidor MCP (Cloudflare Worker) + acceso a datos
     ├── src/
     │   ├── index.ts           # Entry point del Worker (fetch handler, auth, MCP transport)
@@ -53,8 +70,10 @@ El esquema vive como código en `mcp-server/src/db/schemas/*.ts` (Drizzle ORM), 
     │   ├── db/
     │   │   ├── schemas/       # Esquema Drizzle (fuente de verdad del DER)
     │   │   ├── queries/       # Queries por entidad
-    │   │   └── migrations/    # Migraciones generadas por drizzle-kit
-    │   └── lib/               # Enums e interfaces compartidas
+    │   │   ├── migrations/    # Migraciones generadas por drizzle-kit
+    │   │   └── seeds/         # Seed de canchas y horarios (seed.ts)
+    │   ├── schemas/           # Schemas zod de entrada de las tools
+    │   └── lib/               # Enums, constantes e interfaces compartidas
     ├── dev-server.ts          # Servidor HTTP plano para probar el Worker en local sin Wrangler
     └── wrangler.jsonc         # Config de Cloudflare Worker + binding de Hyperdrive
 ```
@@ -73,7 +92,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Esto levanta un Postgres 16 en `localhost:5432`.
+Esto levanta un Postgres 16 en `localhost:5432` (contenedor `padel-quento-db`, volumen `padel_quento_pgdata`). El compose de la web (`padel-quento`) usa el mismo nombre de contenedor y de volumen, así que no se pueden levantar los dos a la vez: usá uno solo. Si ya tenías la base de la web levantada con otro esquema, hay que borrar el volumen (`docker compose down -v`) para empezar de cero con el de Drizzle.
 
 ### 2. MCP Server
 
@@ -90,12 +109,17 @@ MCP_API_KEY="cualquier-string-secreto-para-local"
 PORT=8787
 ```
 
-Instalar dependencias y aplicar el esquema a la base:
+Instalar dependencias, aplicar las migraciones y cargar los datos iniciales:
 
 ```bash
 pnpm install
-pnpm db:push   # sincroniza el esquema de Drizzle contra la base local (puede pedir confirmación interactiva)
+pnpm db:migrate   # crea las tablas a partir de src/db/migrations
+pnpm seed         # 8 canchas con horario 09:00-23:00 todos los días (idempotente)
 ```
+
+Si cambiás los schemas de `src/db/schemas/`, generá una migración nueva con `pnpm db:generate` y aplicala con `pnpm db:migrate`. Evitá `pnpm db:push` sobre una base compartida con la web: modifica el esquema directamente sin dejar migración.
+
+El seed no crea cuentas de usuario: `accounts`, `admins` y `players` se cargan aparte (por ejemplo desde la web).
 
 Levantar el servidor sin depender de Wrangler (recomendado para desarrollo rápido, usa `.env` directamente):
 
@@ -133,15 +157,17 @@ curl -s -X POST http://localhost:8787 \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```
 
-Invocar una tool (ejemplo, `list_courts`):
+Invocar una tool (ejemplo, `get_available_bookings`; sin `date` usa la fecha de hoy):
 
 ```bash
 curl -s -X POST http://localhost:8787 \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "x-api-key: <MCP_API_KEY>" \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"list_courts","arguments":{}}}'
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_available_bookings","arguments":{}}}'
 ```
+
+Para una fecha y cancha puntuales: `"arguments":{"date":"2026-09-22","courtId":1}`.
 
 ## Probar / desplegar en la nube
 
