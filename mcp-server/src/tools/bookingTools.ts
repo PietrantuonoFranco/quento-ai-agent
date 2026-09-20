@@ -4,6 +4,8 @@ import { getCourtById, getAllCourts, checkCourtAvailability } from "../db/querie
 import { getScheduleByCourtIdAndDay } from "../db/queries/scheduleQueries";
 import {
   getAvailableBookingsInputSchema,
+  getAvailableTimesInputSchema,
+  checkTimeAvailabilityInputSchema,
   createBookingInputSchema,
 } from "../schemas/inputSchemas";
 import BookingState from "../lib/enums/bookingState";
@@ -73,6 +75,30 @@ async function findAvailableSlots(env: Env, courtId: number, date: string) {
   return slots;
 }
 
+// Turnos libres por cancha para una fecha (todas las canchas disponibles, o solo una).
+async function collectAvailability(env: Env, date: string, courtId?: number) {
+  const courts = courtId
+    ? [await getCourtById(env, courtId)].filter((c): c is NonNullable<typeof c> => c !== null)
+    : await getAllCourts(env, CourtState.AVAILABLE);
+
+  const availability = [];
+
+  for (const courtRow of courts) {
+    const slots = await findAvailableSlots(env, courtRow.id, date);
+
+    if (slots.length > 0) {
+      availability.push({ courtId: courtRow.id, courtNumber: courtRow.number, slots });
+    }
+  }
+
+  return availability;
+}
+
+// "2026-09-19T13:00:00.000Z" -> "13:00"
+function slotToTime(slot: string): string {
+  return slot.slice(11, 16);
+}
+
 // Un turno solo es válido si arranca justo en uno de los bloques de la
 // grilla (apertura, apertura + 90', apertura + 180', ...) y entra completo
 // antes del cierre.
@@ -99,22 +125,41 @@ export function getBookingTools(env: Env): Tool[] {
         "Lists available fixed-length booking slots for a given date (today if omitted), optionally for a specific court",
       inputSchema: getAvailableBookingsInputSchema,
       execute: async (input) => {
+        return collectAvailability(env, input.date ?? todayInClubTimezone(), input.courtId);
+      },
+    },
+    {
+      name: "get_available_times",
+      description:
+        "Lists the distinct start times (HH:MM) that have at least one court free on a given date (today if omitted). Times shared by several courts appear only once; use get_available_bookings to see which courts",
+      inputSchema: getAvailableTimesInputSchema,
+      execute: async (input) => {
         const date = input.date ?? todayInClubTimezone();
-        const courts = input.courtId
-          ? [await getCourtById(env, input.courtId)].filter((c): c is NonNullable<typeof c> => c !== null)
-          : await getAllCourts(env, CourtState.AVAILABLE);
+        const availability = await collectAvailability(env, date);
+        const times = [...new Set(availability.flatMap((court) => court.slots.map(slotToTime)))].sort();
 
-        const availability = [];
+        return { date, durationMinutes: BOOKING_DURATION_MINUTES, times };
+      },
+    },
+    {
+      name: "check_time_availability",
+      description:
+        "Checks whether a specific start time (HH:MM) is bookable on a given date (today if omitted) and which courts are free at that time. If it is not available, returns the other available times that day",
+      inputSchema: checkTimeAvailabilityInputSchema,
+      execute: async (input) => {
+        const date = input.date ?? todayInClubTimezone();
+        const availability = await collectAvailability(env, date);
+        const courts = availability
+          .filter((court) => court.slots.some((slot) => slotToTime(slot) === input.time))
+          .map(({ courtId, courtNumber }) => ({ courtId, courtNumber }));
 
-        for (const courtRow of courts) {
-          const slots = await findAvailableSlots(env, courtRow.id, date);
-
-          if (slots.length > 0) {
-            availability.push({ courtId: courtRow.id, courtNumber: courtRow.number, slots });
-          }
+        if (courts.length > 0) {
+          return { date, time: input.time, available: true, courts };
         }
 
-        return availability;
+        const availableTimes = [...new Set(availability.flatMap((court) => court.slots.map(slotToTime)))].sort();
+
+        return { date, time: input.time, available: false, courts: [], availableTimes };
       },
     },
     {

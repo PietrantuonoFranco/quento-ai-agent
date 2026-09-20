@@ -23,6 +23,33 @@ export const getAvailableBookingsInputSchema = z.object({
 });
 
 /**
+ * Listar los horarios disponibles como unidad: si varias canchas tienen libre el mismo
+ * horario, se devuelve una sola vez.
+ */
+export const getAvailableTimesInputSchema = z.object({
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected format YYYY-MM-DD")
+    .optional()
+    .describe("Date to list available times for (YYYY-MM-DD); defaults to today"),
+});
+
+/**
+ * Consultar la disponibilidad de un horario en particular.
+ */
+export const checkTimeAvailabilityInputSchema = z.object({
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected format YYYY-MM-DD")
+    .optional()
+    .describe("Date to check (YYYY-MM-DD); defaults to today"),
+  time: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Expected format HH:MM (24h)")
+    .describe("Start time to check (HH:MM, 24h, club local time)"),
+});
+
+/**
  * Saber si un booker ya está registrado, a partir de su número de teléfono.
  */
 export const isBookerRegisteredInputSchema = z.object({

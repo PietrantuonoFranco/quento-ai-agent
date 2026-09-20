@@ -47,6 +47,8 @@ Los horarios de reservas y partidos se guardan como **hora de pared del club** e
 | Tool | Descripción |
 |---|---|
 | `get_available_bookings` | Turnos libres para una fecha (`date`, `YYYY-MM-DD`; **si se omite, hoy**) y opcionalmente una cancha (`courtId`) |
+| `get_available_times` | Horarios de inicio (`HH:MM`) con al menos una cancha libre en una fecha (hoy por defecto); cada horario aparece una sola vez aunque haya varias canchas |
+| `check_time_availability` | Consulta un horario puntual (`time`, `HH:MM`, y `date` opcional): indica si está disponible y qué canchas están libres; si no, devuelve los horarios alternativos del día |
 | `create_booking` | Reserva un turno para un booker registrado (`courtId`, `bookerPhoneNumber`, `datetime`); valida grilla y disponibilidad |
 | `is_booker_registered` / `register_booker` | Consulta / alta de quien reserva, identificado por teléfono |
 | `list_courts` / `get_court_status` | Canchas (filtrables por estado) y estado de una cancha puntual |
