@@ -175,6 +175,22 @@ curl -s -X POST http://localhost:8787 \
 
 Para una fecha y cancha puntuales: `"arguments":{"date":"2026-09-22","courtId":1}`.
 
+## Tests
+
+Son unitarios y no necesitan base de datos ni Docker: las queries se mockean y la fecha "actual" se fija con fake timers.
+
+```bash
+# MCP Server (Vitest): tools, schemas zod, clubTime y el fetch handler (auth, tools/list, concurrencia)
+cd mcp-server
+pnpm test          # una corrida; pnpm test:watch para modo watch
+
+# MCP Host (pytest): cliente MCP, config y health check
+cd mcp-host
+uv run pytest
+```
+
+Los tests del server viven en `mcp-server/test/` y los del host en `mcp-host/tests/`. No prueban contra Postgres real, Wrangler ni el Worker desplegado.
+
 ## Probar / desplegar en la nube
 
 El MCP Server se despliega como Cloudflare Worker:
