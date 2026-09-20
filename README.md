@@ -189,6 +189,8 @@ cd mcp-host
 uv run pytest
 ```
 
+GitHub Actions (`.github/workflows/tests.yml`) corre ambos conjuntos en cada push y pull request.
+
 Los tests del server viven en `mcp-server/test/` y los del host en `mcp-host/tests/`. No prueban contra Postgres real, Wrangler ni el Worker desplegado.
 
 ## Probar / desplegar en la nube
