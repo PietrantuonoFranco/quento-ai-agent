@@ -48,17 +48,19 @@ WhatsApp (Meta Cloud API) ──webhook──▶ mcp-host (FastAPI)
 - [x] `prompts.py`: español rioplatense, tono breve, sin precios, fecha y hora actuales del club.
 - [x] `chat.py`: chat por consola (`uv run python chat.py`).
 - [x] Tests con mocks (55 en total en `mcp-host`).
-- [ ] **Probar con Gemini real** y afinar el prompt (hace falta `GEMINI_API_KEY` en `mcp-host/.env`).
+- [x] **Probar con Gemini real** y afinar el prompt (hace falta `GEMINI_API_KEY` en `mcp-host/.env`).
 
 ### Fase 3 · WhatsApp y memoria
-- [ ] `GET /webhook`: verificación de Meta.
-- [ ] `POST /webhook`: validar firma `X-Hub-Signature-256`.
-- [ ] Responder 200 enseguida y procesar en background.
-- [ ] Deduplicar por `message.id` (Meta reintenta).
-- [ ] Leer `contacts[0].wa_id` y `contacts[0].profile.name` del payload del webhook.
-- [ ] Enviar respuestas por la API de WhatsApp.
-- [ ] Memoria por número de teléfono (últimos N mensajes o último día). Empezar en memoria, luego Redis o Postgres.
-- [ ] Manejar mensajes que no son texto (audio, imagen): responder que solo se atiende por texto.
+- [x] `GET /webhook`: verificación de Meta.
+- [x] `POST /webhook`: validar firma `X-Hub-Signature-256`.
+- [x] Responder 200 enseguida y procesar en background.
+- [x] Deduplicar por `message.id` (Meta reintenta).
+- [x] Leer `contacts[0].wa_id` y `contacts[0].profile.name` del payload del webhook.
+- [x] Enviar respuestas por la API de WhatsApp.
+- [x] Memoria por número de teléfono en RAM (últimos 40 mensajes, 24 h de inactividad). Pendiente: persistirla (Redis o Postgres).
+- [x] Manejar mensajes que no son texto (audio, imagen): responder que solo se atiende por texto.
+- [x] `simulate.py`: webhook firmado de mentira para probar sin Meta (con `WHATSAPP_DRY_RUN=true` las respuestas salen por log).
+- [ ] Prueba real con el número de prueba de Meta + túnel.
 
 ### Fase 4 · Calidad y deploy
 - [ ] Tests del agente mockeando Gemini y el MCP.
