@@ -11,3 +11,5 @@ export { outOfService } from "./outOfServiceSchema";
 export { penalty } from "./penaltySchema";
 export { player } from "./playerSchema";
 export { schedule } from "./scheduleSchema";
+export { fixedBooking, fixedBookingFrequency } from "./fixedBookingSchema";
+export { fixedBookingDate, fixedBookingDateState } from "./fixedBookingDateSchema";

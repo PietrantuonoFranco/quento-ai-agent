@@ -8,6 +8,13 @@
       "when": 1789827155029,
       "tag": "0000_pretty_the_captain",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791696461852,
+      "tag": "0001_add_fixed_bookings",
+      "breakpoints": true
     }
   ]
 }
