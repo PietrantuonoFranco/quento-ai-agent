@@ -1,15 +1,9 @@
-export { account } from "./accountSchema";
-export { admin } from "./adminSchema";
+// Espejo de las tablas que usa el bot. El esquema lo crea y migra la web
+// (padel-quento, TypeORM); acá solo se describe para consultarlo con Drizzle.
 export { booker } from "./bookerSchema";
-export { booking } from "./bookingSchema";
-export { chatRoom } from "./chatRoomSchema";
-export { court } from "./courtSchema";
+export { booking, bookingStateEnum } from "./bookingSchema";
+export { court, courtStateEnum } from "./courtSchema";
 export { matchPlayer } from "./matchPlayerSchema";
 export { match } from "./matchSchema";
-export { message } from "./messageSchema";
-export { outOfService } from "./outOfServiceSchema";
-export { penalty } from "./penaltySchema";
-export { player } from "./playerSchema";
-export { schedule } from "./scheduleSchema";
-export { fixedBooking, fixedBookingFrequency } from "./fixedBookingSchema";
-export { fixedBookingDate, fixedBookingDateState } from "./fixedBookingDateSchema";
+export { outOfService, outOfServiceReasonEnum } from "./outOfServiceSchema";
+export { schedule, dayOfWeekEnum } from "./scheduleSchema";

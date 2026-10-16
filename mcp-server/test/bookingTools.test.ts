@@ -19,8 +19,8 @@ import { NOW_UTC, TODAY, TOMORROW, at, bookingRow, callTool, env, schedule } fro
 const tools = getBookingTools(env);
 const call = (name: string, args: Record<string, unknown> = {}) => callTool(tools, name, args);
 
-const court1 = { id: 1, number: 1, state: "available" };
-const court2 = { id: 2, number: 2, state: "available" };
+const court1 = { id: 1, number: 1, state: "available", price: "20000.00" };
+const court2 = { id: 2, number: 2, state: "available", price: "20000.00" };
 
 // Grilla de 90' con apertura 09:00 y cierre 23:00 (el último turno que entra arranca 21:00).
 const FULL_GRID = ["09:00", "10:30", "12:00", "13:30", "15:00", "16:30", "18:00", "19:30", "21:00"];
@@ -340,6 +340,7 @@ describe("create_booking", () => {
       datetime: at(TOMORROW, "12:00"),
       durationMinutes: 90,
       bookingState: "reserved",
+      price: "20000.00",
     });
     expect(result).toMatchObject({ id: 1 });
   });
@@ -357,6 +358,13 @@ describe("create_booking", () => {
     q(bookerQueries.getBookerByPhoneNumber).mockResolvedValue(null as any);
 
     await expect(call("create_booking", input)).rejects.toThrow("not registered");
+    expect(bookingQueries.createBooking).not.toHaveBeenCalled();
+  });
+
+  it("falla si la cancha no existe", async () => {
+    q(courtQueries.getCourtById).mockResolvedValue(null as any);
+
+    await expect(call("create_booking", input)).rejects.toThrow("Court not found");
     expect(bookingQueries.createBooking).not.toHaveBeenCalled();
   });
 
