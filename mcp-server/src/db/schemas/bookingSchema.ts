@@ -1,20 +1,22 @@
-import { pgTable, serial, varchar, integer, numeric, timestamp, boolean } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { pgTable, pgEnum, serial, varchar, integer, numeric, timestamp, boolean } from "drizzle-orm/pg-core";
 
 import { court } from "./courtSchema";
 import { booker } from "./bookerSchema";
+import BookingState from "../../lib/enums/bookingState";
 
+
+export const bookingStateEnum = pgEnum("bookings_booking_state_enum", BookingState);
 
 export const booking = pgTable("bookings", {
   id: serial("id").primaryKey(),
 
-  courtId: integer("court_id").notNull().references(() => court.id),
-  bookerPhoneNumber: varchar("booker_phone_number", { length: 20 }).notNull().references(() => booker.phoneNumber),
+  courtId: integer("court_id").references(() => court.id),
+  bookerPhoneNumber: varchar("booker_phone_number").references(() => booker.phoneNumber, { onUpdate: "cascade" }),
 
-  bookingState: varchar("booking_state", { length: 50 }).notNull(),
+  bookingState: bookingStateEnum("booking_state").notNull(),
   datetime: timestamp("datetime", { mode: 'date' }).notNull(),
-  durationMinutes: integer("duration_minutes").notNull(),
-
-  createdAt: timestamp("created_at", { mode: 'date' }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: 'date' }).defaultNow().notNull(),
+  durationMinutes: integer("duration_minutes").default(90).notNull(),
+  price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+  attended: boolean("attended").default(true).notNull(),
+  pointsAwarded: boolean("points_awarded").default(false).notNull(),
 });

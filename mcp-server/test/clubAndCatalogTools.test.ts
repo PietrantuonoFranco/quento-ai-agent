@@ -132,6 +132,7 @@ describe("booker tools", () => {
       names: "Ana",
       lastNames: "Paz",
       phoneNumber: "5491111",
+      type: "Booker",
     });
     expect(result).toEqual(booker);
   });

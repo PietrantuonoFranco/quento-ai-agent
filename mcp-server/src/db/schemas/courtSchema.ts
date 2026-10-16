@@ -1,12 +1,14 @@
-import { pgTable, serial, varchar, integer, numeric, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, serial, integer, numeric } from "drizzle-orm/pg-core";
 
+import CourtState from "../../lib/enums/courtState";
+
+
+export const courtStateEnum = pgEnum("courts_state_enum", CourtState);
 
 export const court = pgTable("courts", {
   id: serial("id").primaryKey(),
 
-  number: integer("number").notNull(),
-  state: varchar("court_state", { length: 50 }).notNull(),
-  
-  createdAt: timestamp("created_at", { mode: 'date' }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: 'date' }).defaultNow().notNull(),
+  number: integer("number").notNull().unique("UQ_74a18c6d202c625dd7d68768cdb"),
+  state: courtStateEnum("state").notNull(),
+  price: numeric("price", { precision: 10, scale: 2 }).notNull(),
 });
