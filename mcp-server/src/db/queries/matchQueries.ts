@@ -1,5 +1,5 @@
 import { getDb } from "../database";
-import { booking, match, matchPlayer, player } from "../schemas";
+import { booker, booking, match, matchPlayer } from "../schemas";
 import { and, eq, sql } from "drizzle-orm";
 import type Env from "../../lib/interfaces/EnvInterface";
 import BookingState from "../../lib/enums/bookingState";
@@ -35,7 +35,7 @@ export async function getOpenMatches(
 
   if (filters.courtId !== undefined) conditions.push(eq(booking.courtId, filters.courtId));
   if (filters.date !== undefined) conditions.push(sql`${booking.datetime}::date = ${filters.date}::date`);
-  if (filters.category !== undefined) conditions.push(eq(player.category, filters.category));
+  if (filters.category !== undefined) conditions.push(eq(booker.category, filters.category));
 
   return db
     .selectDistinct({
@@ -49,7 +49,7 @@ export async function getOpenMatches(
     .from(match)
     .innerJoin(booking, eq(match.bookingId, booking.id))
     .leftJoin(matchPlayer, eq(matchPlayer.matchId, match.id))
-    .leftJoin(player, eq(player.id, matchPlayer.playerId))
+    .leftJoin(booker, eq(booker.id, matchPlayer.playerId))
     .where(and(...conditions));
 }
 
@@ -76,7 +76,7 @@ export async function closeMatch(env: Env, matchId: number) {
   const db = getDb(env);
   const players = await db.select().from(matchPlayer).where(eq(matchPlayer.matchId, matchId));
 
-  await db.update(match).set({ needPlayers: false, updatedAt: new Date() }).where(eq(match.id, matchId));
+  await db.update(match).set({ needPlayers: false }).where(eq(match.id, matchId));
 
   return players.length;
 }
@@ -94,11 +94,11 @@ export async function cancelMatch(env: Env, matchId: number) {
   const matchRow = await db.select().from(match).where(eq(match.id, matchId)).limit(1);
   const found = matchRow[0];
 
-  if (!found) return null;
+  if (!found?.bookingId) return null;
 
   const result = await db
     .update(booking)
-    .set({ bookingState: BookingState.CANCELLED, updatedAt: new Date() })
+    .set({ bookingState: BookingState.CANCELLED })
     .where(eq(booking.id, found.bookingId))
     .returning();
 

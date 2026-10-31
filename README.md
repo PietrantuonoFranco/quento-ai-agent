@@ -27,16 +27,12 @@ Flujo de un mensaje (según el diagrama):
 
 Entidades principales:
 
-- **account / admin / player / booker**: cuentas de usuario y sus roles (jugador, quien reserva, administrador).
-- **courts**, **schedules**, **out_of_services**: canchas, horarios de apertura/cierre por día y períodos fuera de servicio.
-- **bookings**: reservas de cancha asociadas a un `booker` y un horario.
-- **matchs / match_players**: partidos abiertos a partir de una reserva y los jugadores anotados.
-- **penalties**: penalizaciones de puntaje a jugadores.
-- **chat_rooms / messages**: chats asociados a un partido.
+- **bookers**: quien reserva, identificado por teléfono. Los jugadores registrados (Player) viven en la misma tabla con `type = 'Player'` y sus datos propios (`account_id`, `category`, `scoring`).
+- **courts**, **schedules**, **out_of_services**: canchas (con su precio), horarios de apertura/cierre por día y períodos fuera de servicio.
+- **bookings**: reservas de cancha asociadas a un `booker` (por teléfono), un horario y el precio de la cancha al reservar.
+- **matches / match_players**: partidos abiertos a partir de una reserva y los jugadores anotados.
 
-El esquema vive como código en `mcp-server/src/db/schemas/*.ts` (Drizzle ORM), que es la fuente de verdad sobre el DER. Las tablas se crean con las migraciones de `mcp-server/src/db/migrations/`. Los estados (`courts.court_state`, `bookings.booking_state`, `schedules.day_of_week`, etc.) son columnas `varchar` cuyos valores válidos están en `mcp-server/src/lib/enums/`.
-
-> **Base compartida con la web.** Esta misma base también la consume la web de Quento (`padel-quento`, Next.js + TypeORM). Como el esquema lo gestiona Drizzle, la web debe mapear sus entidades a estas tablas y columnas (con `synchronize: false` y sin correr sus propias migraciones de TypeORM contra esta base).
+> **El esquema es de la web.** La base la crea y migra la web de Quento (`padel-quento`, Next.js + TypeORM). En el bot, `mcp-server/src/db/schemas/*.ts` es un espejo en Drizzle (Cloudflare Workers no se lleva bien con TypeORM) de **solo las tablas que usa el bot**; el resto (cuentas, admins, chats, penalizaciones, turnos fijos, reseñas) existe en la base pero no se declara acá. Los estados son enums de Postgres cuyos valores replican `mcp-server/src/lib/enums/`. Si la web cambia una de estas tablas, hay que actualizar el schema correspondiente a mano.
 
 ### Convención de fechas
 
@@ -56,7 +52,7 @@ Los horarios de reservas y partidos se guardan como **hora de pared del club** e
 | `is_booker_registered` / `register_booker` | Consulta / alta de quien reserva, identificado por teléfono |
 | `list_courts` / `get_court_status` | Canchas (filtrables por estado) y estado de una cancha puntual |
 | `get_open_matches` | Partidos que buscan jugadores, filtrables por fecha, cancha o categoría |
-| `create_match_from_booking` | Convierte una reserva futura en un partido abierto que busca jugadores (pasa la reserva a `pending_players`) |
+| `create_match_from_booking` | Convierte una reserva futura en un partido abierto que busca jugadores (la reserva conserva su estado) |
 | `join_match` / `leave_match` | Sumar o quitar a un jugador de un partido |
 
 ### Estructura del repo
@@ -74,9 +70,8 @@ Los horarios de reservas y partidos se guardan como **hora de pared del club** e
     │   ├── server.ts          # Fábrica del McpServer (uno por request) con sus tools registradas
     │   ├── tools/             # Tools MCP agrupadas por dominio (bookings, courts, matches, booker)
     │   ├── db/
-    │   │   ├── schemas/       # Esquema Drizzle (fuente de verdad del DER)
+    │   │   ├── schemas/       # Espejo Drizzle de las tablas de la web que usa el bot
     │   │   ├── queries/       # Queries por entidad
-    │   │   ├── migrations/    # Migraciones generadas por drizzle-kit
     │   │   └── seeds/         # Seed de canchas y horarios (seed.ts)
     │   ├── schemas/           # Schemas zod de entrada de las tools
     │   └── lib/               # Enums, constantes e interfaces compartidas
@@ -115,17 +110,16 @@ MCP_API_KEY="cualquier-string-secreto-para-local"
 PORT=8787
 ```
 
-Instalar dependencias, aplicar las migraciones y cargar los datos iniciales:
+Las tablas se crean desde la web (`pnpm migration:run` en `padel-quento`). Después, instalar dependencias y cargar los datos iniciales:
 
 ```bash
 pnpm install
-pnpm db:migrate   # crea las tablas a partir de src/db/migrations
 pnpm seed         # 8 canchas con horario 09:00-23:00 todos los días (idempotente)
 ```
 
-Si cambiás los schemas de `src/db/schemas/`, generá una migración nueva con `pnpm db:generate` y aplicala con `pnpm db:migrate`. Evitá `pnpm db:push` sobre una base compartida con la web: modifica el esquema directamente sin dejar migración.
+No uses `drizzle-kit push`/`migrate` sobre esta base: como el espejo es parcial, Drizzle intentaría borrar las tablas que no declara.
 
-El seed no crea cuentas de usuario: `accounts`, `admins` y `players` se cargan aparte (por ejemplo desde la web).
+El seed no crea cuentas de usuario ni jugadores: se cargan desde la web.
 
 Levantar el servidor sin depender de Wrangler (recomendado para desarrollo rápido, usa `.env` directamente):
 

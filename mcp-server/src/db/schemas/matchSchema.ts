@@ -1,14 +1,11 @@
-import { pgTable, serial, integer, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, boolean } from "drizzle-orm/pg-core";
 
 import { booking } from "./bookingSchema";
 
 
-export const match = pgTable("matchs", {
+export const match = pgTable("matches", {
   id: serial("id").primaryKey(),
 
-  bookingId: integer("booking_id").notNull().references(() => booking.id),
-  needPlayers: boolean("need_players").notNull().default(false),
-
-  createdAt: timestamp("created_at", { mode: 'date' }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: 'date' }).defaultNow().notNull(),
+  bookingId: integer("booking_id").references(() => booking.id).unique("UQ_matches_booking_id"),
+  needPlayers: boolean("need_players").notNull().default(true),
 });

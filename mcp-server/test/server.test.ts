@@ -136,11 +136,10 @@ describe("Worker fetch handler", () => {
   });
 
   it("atiende requests concurrentes sin 'Internal MCP server error'", async () => {
-    // TOMORROW es una fecha fija del fixture: sin esto, con el reloj real la fecha
-    // queda en el pasado (los slots se filtran) apenas pasa el día en que se escribió el test.
+    // TOMORROW es una fecha fija: sin congelar el reloj, una vez pasada ya no
+    // tiene horarios libres y el test falla según el día en que corre.
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(NOW_UTC));
-
     vi.mocked(courtQueries.getAllCourts).mockResolvedValue([{ id: 1, number: 1, state: "available" }] as any);
     vi.mocked(scheduleQueries.getSchedulesByDay).mockResolvedValue([schedule(1)] as any);
     vi.mocked(bookingQueries.getActiveBookingsInRange).mockResolvedValue([]);

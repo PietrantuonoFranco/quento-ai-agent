@@ -1,4 +1,5 @@
 import { getBookerByPhoneNumber, createBooker } from "../db/queries/bookerQueries";
+import BookerType from "../lib/enums/bookerType";
 import {
   isBookerRegisteredInputSchema,
   registerBookerInputSchema,
@@ -27,7 +28,7 @@ export function getBookerTools(env: Env): Tool[] {
 
         if (existing) return existing;
 
-        return createBooker(env, input);
+        return createBooker(env, { ...input, type: BookerType.BOOKER });
       },
     },
   ];

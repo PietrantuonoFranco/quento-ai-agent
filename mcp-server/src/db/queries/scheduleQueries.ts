@@ -2,6 +2,7 @@ import { getDb } from "../database";
 import { schedule } from "../schemas";
 import { and, eq } from "drizzle-orm";
 import type Env from "../../lib/interfaces/EnvInterface";
+import type DayOfWeek from "../../lib/enums/dayOfWeek";
 
 export async function getScheduleById(env: Env, id: number) {
   const db = getDb(env);
@@ -23,7 +24,7 @@ export async function createSchedule(env: Env, values: typeof schedule.$inferIns
   return result[0];
 }
 
-export async function getScheduleByCourtIdAndDay(env: Env, courtId: number, dayOfWeek: string) {
+export async function getScheduleByCourtIdAndDay(env: Env, courtId: number, dayOfWeek: DayOfWeek) {
   const db = getDb(env);
   const result = await db
     .select()
@@ -46,7 +47,7 @@ export async function getAllSchedules(env: Env) {
 }
 
 // Horarios de un día de la semana para todas las canchas (o una sola) en una única query.
-export async function getSchedulesByDay(env: Env, dayOfWeek: string, courtId?: number) {
+export async function getSchedulesByDay(env: Env, dayOfWeek: DayOfWeek, courtId?: number) {
   const db = getDb(env);
 
   return db

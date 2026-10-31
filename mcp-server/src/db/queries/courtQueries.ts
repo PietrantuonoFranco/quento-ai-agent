@@ -26,7 +26,7 @@ export async function createCourt(env: Env, values: typeof court.$inferInsert) {
   return result[0];
 }
 
-export async function getAllCourts(env: Env, state?: string) {
+export async function getAllCourts(env: Env, state?: CourtState) {
   const db = getDb(env);
 
   if (state !== undefined) {
@@ -40,7 +40,7 @@ export async function blockCourt(env: Env, id: number) {
   const db = getDb(env);
   const result = await db
     .update(court)
-    .set({ state: CourtState.OUT_OF_SERVICE, updatedAt: new Date() })
+    .set({ state: CourtState.OUT_OF_SERVICE })
     .where(eq(court.id, id))
     .returning();
 
@@ -51,7 +51,7 @@ export async function unblockCourt(env: Env, id: number) {
   const db = getDb(env);
   const result = await db
     .update(court)
-    .set({ state: CourtState.AVAILABLE, updatedAt: new Date() })
+    .set({ state: CourtState.AVAILABLE })
     .where(eq(court.id, id))
     .returning();
 

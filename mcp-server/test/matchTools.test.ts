@@ -3,13 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../src/db/queries/matchQueries");
 vi.mock("../src/db/queries/bookingQueries");
 vi.mock("../src/db/queries/bookerQueries");
-vi.mock("../src/db/queries/playerQueries");
 vi.mock("../src/db/queries/matchPlayerQueries");
 
 import * as matchQueries from "../src/db/queries/matchQueries";
 import * as bookingQueries from "../src/db/queries/bookingQueries";
 import * as bookerQueries from "../src/db/queries/bookerQueries";
-import * as playerQueries from "../src/db/queries/playerQueries";
 import * as matchPlayerQueries from "../src/db/queries/matchPlayerQueries";
 import { getMatchTools } from "../src/tools/matchTools";
 import { NOW_UTC, TODAY, TOMORROW, at, bookingRow, callTool, env } from "./helpers";
@@ -77,25 +75,23 @@ describe("create_match_from_booking", () => {
     q(bookingQueries.getBookingById).mockResolvedValue(bookingRow() as any);
     q(matchQueries.getMatchByBookingId).mockResolvedValue(null as any);
     q(matchQueries.createMatch).mockResolvedValue({ id: 20 } as any);
-    q(bookerQueries.getBookerByPhoneNumber).mockResolvedValue({ id: 5 } as any);
-    q(playerQueries.getPlayerByBookerId).mockResolvedValue(null as any);
+    q(bookerQueries.getBookerByPhoneNumber).mockResolvedValue({ id: 5, type: "Booker" } as any);
   });
 
-  it("crea el partido abierto y pasa la reserva a pending_players", async () => {
+  it("crea el partido abierto sin cambiar el estado de la reserva", async () => {
     const result = await call("create_match_from_booking", input);
 
     expect(matchQueries.createMatch).toHaveBeenCalledWith(env, { bookingId: 1, needPlayers: true });
-    expect(bookingQueries.updateBookingState).toHaveBeenCalledWith(env, 1, "pending_players");
+    expect(bookingQueries.updateBookingState).not.toHaveBeenCalled();
     expect(result).toEqual({ matchId: 20, bookingId: 1, needPlayers: true, ownerJoined: false });
   });
 
-  it("suma al dueño como jugador si el booker tiene un player asociado", async () => {
-    q(playerQueries.getPlayerByBookerId).mockResolvedValue({ id: 8 } as any);
+  it("suma al dueño como jugador si el booker es un Player", async () => {
+    q(bookerQueries.getBookerByPhoneNumber).mockResolvedValue({ id: 5, type: "Player" } as any);
 
     const result = await call("create_match_from_booking", input);
 
-    expect(playerQueries.getPlayerByBookerId).toHaveBeenCalledWith(env, 5);
-    expect(matchPlayerQueries.createMatchPlayer).toHaveBeenCalledWith(env, { matchId: 20, playerId: 8 });
+    expect(matchPlayerQueries.createMatchPlayer).toHaveBeenCalledWith(env, { matchId: 20, playerId: 5 });
     expect(result.ownerJoined).toBe(true);
   });
 

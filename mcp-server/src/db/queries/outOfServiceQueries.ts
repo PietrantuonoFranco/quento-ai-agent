@@ -32,11 +32,11 @@ export async function cancelBookingsAffectedByOutOfService(env: Env, outOfServic
   const db = getDb(env);
   const record = await getOutOfServiceById(env, outOfServiceId);
 
-  if (!record) return [];
+  if (!record?.courtId) return [];
 
   return db
     .update(booking)
-    .set({ bookingState: BookingState.CANCELLED, updatedAt: new Date() })
+    .set({ bookingState: BookingState.CANCELLED })
     .where(
       and(
         eq(booking.courtId, record.courtId),

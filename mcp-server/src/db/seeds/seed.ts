@@ -9,6 +9,7 @@ import DayOfWeek from "../../lib/enums/dayOfWeek";
 const COURTS_COUNT = 8;
 const OPENING_TIME = "09:00:00";
 const CLOSING_TIME = "23:00:00";
+const COURT_PRICE = "10000.00"; // mismo precio que el seed de la web
 
 // Siembra las canchas y su horario semanal. Es idempotente: si ya hay canchas no toca nada.
 async function seed() {
@@ -27,7 +28,7 @@ async function seed() {
 
   const courts = await db
     .insert(schema.court)
-    .values(Array.from({ length: COURTS_COUNT }, (_, i) => ({ number: i + 1, state: CourtState.AVAILABLE })))
+    .values(Array.from({ length: COURTS_COUNT }, (_, i) => ({ number: i + 1, state: CourtState.AVAILABLE, price: COURT_PRICE })))
     .returning();
 
   await db.insert(schema.schedule).values(

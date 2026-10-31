@@ -28,7 +28,7 @@ export async function cancelBooking(env: Env, id: number) {
   const db = getDb(env);
   const result = await db
     .update(booking)
-    .set({ bookingState: BookingState.CANCELLED, updatedAt: new Date() })
+    .set({ bookingState: BookingState.CANCELLED })
     .where(eq(booking.id, id))
     .returning();
 
@@ -84,18 +84,18 @@ export async function rescheduleBooking(env: Env, id: number, courtId: number, d
   const db = getDb(env);
   const result = await db
     .update(booking)
-    .set({ courtId, datetime, updatedAt: new Date() })
+    .set({ courtId, datetime })
     .where(eq(booking.id, id))
     .returning();
 
   return result[0] || null;
 }
 
-export async function updateBookingState(env: Env, id: number, bookingState: string) {
+export async function updateBookingState(env: Env, id: number, bookingState: BookingState) {
   const db = getDb(env);
   const result = await db
     .update(booking)
-    .set({ bookingState, updatedAt: new Date() })
+    .set({ bookingState })
     .where(eq(booking.id, id))
     .returning();
 

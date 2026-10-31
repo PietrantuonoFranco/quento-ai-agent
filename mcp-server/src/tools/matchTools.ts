@@ -1,10 +1,10 @@
 import { getOpenMatches, addPlayerToMatch, createMatch, getMatchByBookingId } from "../db/queries/matchQueries";
-import { getBookingById, updateBookingState } from "../db/queries/bookingQueries";
+import { getBookingById } from "../db/queries/bookingQueries";
 import { getBookerByPhoneNumber } from "../db/queries/bookerQueries";
-import { getPlayerByBookerId } from "../db/queries/playerQueries";
 import { createMatchPlayer } from "../db/queries/matchPlayerQueries";
 import { nowInClubTime } from "../lib/clubTime";
 import BookingState from "../lib/enums/bookingState";
+import BookerType from "../lib/enums/bookerType";
 import { deleteMatchPlayer } from "../db/queries/matchPlayerQueries";
 import {
   getOpenMatchesInputSchema,
@@ -53,14 +53,13 @@ export function getMatchTools(env: Env): Tool[] {
 
         const matchRow = await createMatch(env, { bookingId: bookingRow.id, needPlayers: true });
 
-        await updateBookingState(env, bookingRow.id, BookingState.PENDING_PLAYERS);
-
+        // Un Player es un booker con type "Player", así que su id de jugador es el mismo id de booker.
         const bookerRow = await getBookerByPhoneNumber(env, input.phoneNumber);
-        const playerRow = bookerRow ? await getPlayerByBookerId(env, bookerRow.id) : null;
+        const ownerIsPlayer = bookerRow?.type === BookerType.PLAYER;
 
-        if (playerRow) await createMatchPlayer(env, { matchId: matchRow.id, playerId: playerRow.id });
+        if (ownerIsPlayer) await createMatchPlayer(env, { matchId: matchRow.id, playerId: bookerRow.id });
 
-        return { matchId: matchRow.id, bookingId: bookingRow.id, needPlayers: true, ownerJoined: playerRow !== null };
+        return { matchId: matchRow.id, bookingId: bookingRow.id, needPlayers: true, ownerJoined: ownerIsPlayer };
       },
     },
   ];

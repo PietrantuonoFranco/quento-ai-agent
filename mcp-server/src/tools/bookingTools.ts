@@ -246,12 +246,17 @@ export function getBookingTools(env: Env): Tool[] {
           throw new Error("The court is not available for the requested time slot");
         }
 
+        const courtRow = await getCourtById(env, input.courtId);
+
+        if (!courtRow) throw new Error("Court not found");
+
         return createBooking(env, {
           courtId: input.courtId,
           bookerPhoneNumber: input.bookerPhoneNumber,
           datetime,
           durationMinutes: BOOKING_DURATION_MINUTES,
           bookingState: BookingState.RESERVED,
+          price: courtRow.price,
         });
       },
     },
@@ -279,7 +284,7 @@ export function getBookingTools(env: Env): Tool[] {
       inputSchema: getBookingDetailsInputSchema,
       execute: async (input) => {
         const bookingRow = await getOwnedBooking(env, input.bookingId, input.phoneNumber);
-        const courtRow = await getCourtById(env, bookingRow.courtId);
+        const courtRow = bookingRow.courtId !== null ? await getCourtById(env, bookingRow.courtId) : null;
         const matchRow = await getMatchByBookingId(env, bookingRow.id);
 
         return {
