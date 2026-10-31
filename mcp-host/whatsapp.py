@@ -54,6 +54,11 @@ def parse_messages(payload: dict[str, Any]) -> list[IncomingMessage]:
     return result
 
 
+def _to_recipient(phone: str) -> str:
+    """Webhooks report Argentine mobiles as 549...; the API's recipient list keeps them as 54... (error 131030)."""
+    return "54" + phone[3:] if phone.startswith("549") else phone
+
+
 class Sender(Protocol):
     async def send_text(self, phone: str, text: str) -> None: ...
 
@@ -67,7 +72,7 @@ class CloudApiSender:
     async def send_text(self, phone: str, text: str) -> None:
         body = {
             "messaging_product": "whatsapp",
-            "to": phone,
+            "to": _to_recipient(phone),
             "type": "text",
             "text": {"body": text[:MAX_TEXT_LENGTH]},
         }

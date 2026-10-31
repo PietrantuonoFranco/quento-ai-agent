@@ -69,16 +69,27 @@ async def test_cloud_sender_posts_to_the_graph_api():
         return httpx.Response(200, json={})
 
     http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    await CloudApiSender("tok", "999", "v21.0", http).send_text("549111", "hola")
+    await CloudApiSender("tok", "999", "v21.0", http).send_text("15551234567", "hola")
 
     assert seen["url"] == "https://graph.facebook.com/v21.0/999/messages"
     assert seen["auth"] == "Bearer tok"
     assert seen["body"] == {
         "messaging_product": "whatsapp",
-        "to": "549111",
+        "to": "15551234567",
         "type": "text",
         "text": {"body": "hola"},
     }
+
+
+async def test_cloud_sender_drops_the_argentine_mobile_9():
+    bodies = []
+    http = httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda r: bodies.append(json.loads(r.content)) or httpx.Response(200, json={}))
+    )
+
+    await CloudApiSender("t", "1", "v21.0", http).send_text("5492211234567", "hola")
+
+    assert bodies[0]["to"] == "542211234567"
 
 
 async def test_cloud_sender_truncates_long_text():
