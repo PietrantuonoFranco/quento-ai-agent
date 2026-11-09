@@ -102,6 +102,61 @@ describe("court tools", () => {
   it("list_courts rechaza un estado inválido", async () => {
     await expect(callTool(tools, "list_courts", { state: "roto" })).rejects.toThrow();
   });
+
+  describe("get_court_location", () => {
+    it("devuelve los datos completos de ubicación del complejo por courtId", async () => {
+      q(courtQueries.getCourtById).mockResolvedValue({ id: 2, number: 2 } as any);
+
+      const result = await callTool(tools, "get_court_location", { courtId: 2 });
+
+      expect(courtQueries.getCourtById).toHaveBeenCalledWith(env, 2);
+      expect(result).toEqual({
+        court: { id: 2, number: 2, name: "Cancha 2" },
+        clubName: "Quento Club",
+        address: "Cam. Centenario 8907, B1894 Villa Elisa, Buenos Aires",
+        city: "Villa Elisa",
+        coordinates: {
+          latitude: -34.8637264,
+          longitude: -58.0610566,
+        },
+        googleMapsUrl: "https://maps.app.goo.gl/G4LpSDfyxCWAJHDSA",
+      });
+    });
+
+    it("encuentra la cancha extrayendo el número desde el nombre (ej. 'Cancha 3')", async () => {
+      q(courtQueries.getCourtByNumber).mockResolvedValue({ id: 3, number: 3 } as any);
+
+      const result = await callTool(tools, "get_court_location", { name: "Cancha 3" });
+
+      expect(courtQueries.getCourtByNumber).toHaveBeenCalledWith(env, 3);
+      expect(result.court).toEqual({ id: 3, number: 3, name: "Cancha 3" });
+      expect(result.clubName).toBe("Quento Club");
+      expect(result.googleMapsUrl).toContain("maps");
+    });
+
+    it("encuentra la cancha si el nombre es solo el número", async () => {
+      q(courtQueries.getCourtByNumber).mockResolvedValue({ id: 1, number: 1 } as any);
+
+      const result = await callTool(tools, "get_court_location", { name: "1" });
+
+      expect(courtQueries.getCourtByNumber).toHaveBeenCalledWith(env, 1);
+      expect(result.court).toEqual({ id: 1, number: 1, name: "Cancha 1" });
+    });
+
+    it("lanza un error claro si la cancha no existe", async () => {
+      q(courtQueries.getCourtById).mockResolvedValue(null as any);
+
+      await expect(callTool(tools, "get_court_location", { courtId: 99 })).rejects.toThrow(
+        "Court not found with the provided id or name",
+      );
+    });
+
+    it("lanza un error si no se pasa ni courtId ni name", async () => {
+      await expect(callTool(tools, "get_court_location", {})).rejects.toThrow(
+        "Court not found with the provided id or name",
+      );
+    });
+  });
 });
 
 describe("booker tools", () => {

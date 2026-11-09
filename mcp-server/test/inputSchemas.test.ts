@@ -8,6 +8,7 @@ import {
   getAvailableTimesInputSchema,
   getBookingDetailsInputSchema,
   getClubInfoInputSchema,
+  getCourtLocationInputSchema,
   getMyBookingsInputSchema,
   listCourtsInputSchema,
   rescheduleBookingInputSchema,
@@ -93,5 +94,26 @@ describe("inputSchemas", () => {
 
   it("get_club_info no pide parámetros", () => {
     expect(getClubInfoInputSchema.safeParse({}).success).toBe(true);
+  });
+
+  describe("get_court_location", () => {
+    it("acepta courtId positivo", () => {
+      expect(getCourtLocationInputSchema.safeParse({ courtId: 2 }).success).toBe(true);
+    });
+
+    it("rechaza courtId inválido", () => {
+      expect(getCourtLocationInputSchema.safeParse({ courtId: -1 }).success).toBe(false);
+      expect(getCourtLocationInputSchema.safeParse({ courtId: 0 }).success).toBe(false);
+      expect(getCourtLocationInputSchema.safeParse({ courtId: 1.5 }).success).toBe(false);
+    });
+
+    it("acepta name como string", () => {
+      expect(getCourtLocationInputSchema.safeParse({ name: "Cancha 2" }).success).toBe(true);
+      expect(getCourtLocationInputSchema.safeParse({ name: "2" }).success).toBe(true);
+    });
+
+    it("acepta objeto vacío (parámetros opcionales)", () => {
+      expect(getCourtLocationInputSchema.safeParse({}).success).toBe(true);
+    });
   });
 });
