@@ -26,6 +26,14 @@ TOOLS = [
         },
     ),
     mcp_types.Tool(
+        name="get_court_location",
+        description="location",
+        input_schema={
+            "type": "object",
+            "properties": {"courtId": {"type": "integer"}, "name": {"type": "string"}},
+        },
+    ),
+    mcp_types.Tool(
         name="get_open_matches",
         description="matches",
         input_schema={"type": "object", "properties": {}},
@@ -98,7 +106,7 @@ async def test_only_visible_tools_are_declared_and_without_phone(agent, llm):
     await agent.respond([], "hola", PHONE)
 
     declared = llm.generate.await_args.kwargs["config"].tools[0].function_declarations
-    assert [d.name for d in declared] == ["get_available_times", "cancel_booking"]
+    assert [d.name for d in declared] == ["get_available_times", "cancel_booking", "get_court_location"]
     assert "phoneNumber" not in declared[1].parameters_json_schema["properties"]
 
 
@@ -225,3 +233,60 @@ async def test_a_failed_turn_is_removed_from_the_history(agent, llm, mcp):
 
     assert await agent.respond(history, "c", PHONE) == "dos"
     assert [c.role for c in history] == ["user", "model", "user", "model"]
+
+
+async def test_court_location_question_1_where_is_court_2(agent, llm, mcp):
+    mcp.call_tool.return_value = {
+        "court": {"id": 2, "number": 2, "name": "Cancha 2"},
+        "clubName": "Quento Club",
+        "address": "Cam. Centenario 8907, B1894 Villa Elisa, Buenos Aires",
+        "city": "Villa Elisa",
+        "coordinates": {"latitude": -34.8637264, "longitude": -58.0610566},
+        "googleMapsUrl": "https://maps.app.goo.gl/G4LpSDfyxCWAJHDSA",
+    }
+    llm.generate.side_effect = [
+        tool_call(("get_court_location", {"name": "Cancha 2"})),
+        reply("La Cancha 2 queda en Quento Club, Cam. Centenario 8907, Villa Elisa. Mapa: https://maps.app.goo.gl/G4LpSDfyxCWAJHDSA"),
+    ]
+    history = []
+
+    answer = await agent.respond(history, "¿dónde queda la cancha 2?", PHONE)
+
+    mcp.call_tool.assert_awaited_once_with("get_court_location", {"name": "Cancha 2"})
+    assert "https://maps.app.goo.gl/G4LpSDfyxCWAJHDSA" in answer
+    assert "Cam. Centenario 8907" in answer
+
+
+async def test_court_location_question_2_how_to_get_to_court_1(agent, llm, mcp):
+    mcp.call_tool.return_value = {
+        "court": {"id": 1, "number": 1, "name": "Cancha 1"},
+        "clubName": "Quento Club",
+        "address": "Cam. Centenario 8907, B1894 Villa Elisa, Buenos Aires",
+        "city": "Villa Elisa",
+        "coordinates": {"latitude": -34.8637264, "longitude": -58.0610566},
+        "googleMapsUrl": "https://maps.app.goo.gl/G4LpSDfyxCWAJHDSA",
+    }
+    llm.generate.side_effect = [
+        tool_call(("get_court_location", {"name": "1"})),
+        reply("Para llegar a la cancha 1 podés seguir la ubicación en Google Maps: https://maps.app.goo.gl/G4LpSDfyxCWAJHDSA (Cam. Centenario 8907)."),
+    ]
+    history = []
+
+    answer = await agent.respond(history, "¿cómo llego a la cancha 1?", PHONE)
+
+    mcp.call_tool.assert_awaited_once_with("get_court_location", {"name": "1"})
+    assert "https://maps.app.goo.gl/G4LpSDfyxCWAJHDSA" in answer
+
+
+async def test_court_location_question_3_court_does_not_exist(agent, llm, mcp):
+    mcp.call_tool.side_effect = ToolError("Court not found with the provided id or name")
+    llm.generate.side_effect = [
+        tool_call(("get_court_location", {"name": "Cancha 99"})),
+        reply("No encontré la cancha 99 en el club. Tenemos canchas de la 1 a la 8."),
+    ]
+    history = []
+
+    answer = await agent.respond(history, "¿dónde queda la cancha 99?", PHONE)
+
+    mcp.call_tool.assert_awaited_once_with("get_court_location", {"name": "Cancha 99"})
+    assert "No encontré la cancha 99" in answer

@@ -45,6 +45,7 @@ const EXPECTED_TOOLS = [
   "register_booker",
   "list_courts",
   "get_court_status",
+  "get_court_location",
   "get_open_matches",
   "join_match",
   "leave_match",

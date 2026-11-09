@@ -2,6 +2,7 @@
 // (padel-quento, TypeORM); acá solo se describe para consultarlo con Drizzle.
 export { booker } from "./bookerSchema";
 export { booking, bookingStateEnum } from "./bookingSchema";
+export { complex } from "./complexSchema";
 export { court, courtStateEnum } from "./courtSchema";
 export { matchPlayer } from "./matchPlayerSchema";
 export { match } from "./matchSchema";

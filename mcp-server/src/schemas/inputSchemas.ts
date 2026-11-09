@@ -154,6 +154,23 @@ export const listCourtsInputSchema = z.object({
 });
 
 /**
+ * Consultar la ubicación de una cancha y cómo llegar al complejo.
+ * Acepta el ID de la cancha o su nombre/número (ej. "Cancha 2", "2").
+ */
+export const getCourtLocationInputSchema = z.object({
+  courtId: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe("Specific court ID; if omitted, specify court name or number"),
+  name: z
+    .string()
+    .optional()
+    .describe("Name or number of the court (e.g. 'Cancha 2', '2')"),
+});
+
+/**
  * Consultar partidos abiertos (que aún necesitan jugadores).
  */
 export const getOpenMatchesInputSchema = z.object({

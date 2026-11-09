@@ -5,10 +5,12 @@ import * as schema from "./schemas";
 import type Env from "../lib/interfaces/EnvInterface";
 
 export function getDb(env: Env) {
+  const isSupabase = env.DB.connectionString.includes("supabase");
   const client = postgres(env.DB.connectionString, {
     prepare: false, // requerido por Hyperdrive
     max: 1,
     idle_timeout: 5, // getDb crea un cliente por llamada: sin esto las conexiones quedan abiertas y se agotan
+    ssl: isSupabase ? "require" : undefined,
   });
 
   return drizzle(client, { schema });

@@ -1,7 +1,7 @@
 import { pgTable, pgEnum, serial, integer, numeric } from "drizzle-orm/pg-core";
 
 import CourtState from "../../lib/enums/courtState";
-
+import { complex } from "./complexSchema";
 
 export const courtStateEnum = pgEnum("courts_state_enum", CourtState);
 
@@ -11,4 +11,5 @@ export const court = pgTable("courts", {
   number: integer("number").notNull().unique("UQ_74a18c6d202c625dd7d68768cdb"),
   state: courtStateEnum("state").notNull(),
   price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+  complexId: integer("complex_id").notNull().references(() => complex.id),
 });

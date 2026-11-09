@@ -1,16 +1,13 @@
-import "dotenv/config";
 import { createServer, type IncomingMessage } from "node:http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, ".env") });
 
 import worker from "./src/index";
 import type Env from "./src/lib/interfaces/EnvInterface";
-
-import { Headers, Request } from "node-fetch";
-
-import { Buffer } from "node:buffer";
-
-import dotenv from "dotenv";
-
-dotenv.config();
 
 const PORT = Number(process.env.PORT) || 8787;
 

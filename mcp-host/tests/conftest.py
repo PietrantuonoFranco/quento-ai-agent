@@ -5,3 +5,4 @@ import os
 os.environ["MCP_SERVER_URL"] = "http://mcp.test"
 os.environ["MCP_API_KEY"] = "test-key"
 os.environ["GEMINI_API_KEY"] = "gemini-test-key"
+os.environ["GEMINI_MODEL"] = "gemini-3.6-flash"

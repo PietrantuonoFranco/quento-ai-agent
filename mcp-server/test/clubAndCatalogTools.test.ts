@@ -102,6 +102,92 @@ describe("court tools", () => {
   it("list_courts rechaza un estado inválido", async () => {
     await expect(callTool(tools, "list_courts", { state: "roto" })).rejects.toThrow();
   });
+
+  const mockComplex = {
+    id: 1,
+    name: "Quento Club",
+    address: "Cam. Centenario 8907",
+    city: "Villa Elisa",
+    province: "Buenos Aires",
+    country: "Argentina",
+    postalCode: "B1894",
+    latitude: "-34.863726",
+    longitude: "-58.061057",
+    mapsUrl: "https://maps.app.goo.gl/G4LpSDfyxCWAJHDSA",
+    whatsappNumber: "+54 9 221 604-9987",
+    whatsappMessage: "Hola, quiero hacer una consulta sobre Quento Club.",
+  };
+
+  describe("get_court_location", () => {
+    it("devuelve los datos de la base de datos (court y complex) por courtId", async () => {
+      q(courtQueries.getCourtWithComplexById).mockResolvedValue({
+        court: { id: 2, number: 2 } as any,
+        complex: mockComplex as any,
+      });
+
+      const result = await callTool(tools, "get_court_location", { courtId: 2 });
+
+      expect(courtQueries.getCourtWithComplexById).toHaveBeenCalledWith(env, 2);
+      expect(result).toEqual({
+        court: { id: 2, number: 2, name: "Cancha 2" },
+        clubName: "Quento Club",
+        address: "Cam. Centenario 8907",
+        city: "Villa Elisa",
+        province: "Buenos Aires",
+        country: "Argentina",
+        postalCode: "B1894",
+        coordinates: {
+          latitude: -34.863726,
+          longitude: -58.061057,
+        },
+        googleMapsUrl: "https://maps.app.goo.gl/G4LpSDfyxCWAJHDSA",
+      });
+    });
+
+    it("encuentra la cancha extrayendo el número desde el nombre (ej. 'Cancha 3')", async () => {
+      q(courtQueries.getCourtWithComplexByNumber).mockResolvedValue({
+        court: { id: 3, number: 3 } as any,
+        complex: mockComplex as any,
+      });
+
+      const result = await callTool(tools, "get_court_location", { name: "Cancha 3" });
+
+      expect(courtQueries.getCourtWithComplexByNumber).toHaveBeenCalledWith(env, 3);
+      expect(result.court).toEqual({ id: 3, number: 3, name: "Cancha 3" });
+      expect(result.clubName).toBe("Quento Club");
+      expect(result.googleMapsUrl).toContain("maps");
+    });
+
+    it("encuentra la cancha si el nombre es solo el número", async () => {
+      q(courtQueries.getCourtWithComplexByNumber).mockResolvedValue({
+        court: { id: 1, number: 1 } as any,
+        complex: mockComplex as any,
+      });
+
+      const result = await callTool(tools, "get_court_location", { name: "1" });
+
+      expect(courtQueries.getCourtWithComplexByNumber).toHaveBeenCalledWith(env, 1);
+      expect(result.court).toEqual({ id: 1, number: 1, name: "Cancha 1" });
+    });
+
+    it("devuelve la ubicación general del complejo si no se pasa ni courtId ni name", async () => {
+      q(courtQueries.getDefaultComplex).mockResolvedValue(mockComplex as any);
+
+      const result = await callTool(tools, "get_court_location", {});
+
+      expect(courtQueries.getDefaultComplex).toHaveBeenCalledWith(env);
+      expect(result.clubName).toBe("Quento Club");
+      expect(result.address).toBe("Cam. Centenario 8907");
+    });
+
+    it("lanza un error claro si la cancha no existe", async () => {
+      q(courtQueries.getCourtWithComplexById).mockResolvedValue(null as any);
+
+      await expect(callTool(tools, "get_court_location", { courtId: 99 })).rejects.toThrow(
+        "Court not found with the provided id or name",
+      );
+    });
+  });
 });
 
 describe("booker tools", () => {

@@ -1,5 +1,5 @@
 import { getDb } from "../database";
-import { court, outOfService } from "../schemas";
+import { court, complex, outOfService } from "../schemas";
 import { and, eq, sql } from "drizzle-orm";
 import type Env from "../../lib/interfaces/EnvInterface";
 import CourtState from "../../lib/enums/courtState";
@@ -15,6 +15,43 @@ export async function getCourtById(env: Env, id: number) {
 export async function getCourtByNumber(env: Env, number: number) {
   const db = getDb(env);
   const result = await db.select().from(court).where(eq(court.number, number)).limit(1);
+
+  return result[0] || null;
+}
+
+export async function getCourtWithComplexById(env: Env, id: number) {
+  const db = getDb(env);
+  const result = await db
+    .select({
+      court,
+      complex,
+    })
+    .from(court)
+    .innerJoin(complex, eq(court.complexId, complex.id))
+    .where(eq(court.id, id))
+    .limit(1);
+
+  return result[0] || null;
+}
+
+export async function getCourtWithComplexByNumber(env: Env, number: number) {
+  const db = getDb(env);
+  const result = await db
+    .select({
+      court,
+      complex,
+    })
+    .from(court)
+    .innerJoin(complex, eq(court.complexId, complex.id))
+    .where(eq(court.number, number))
+    .limit(1);
+
+  return result[0] || null;
+}
+
+export async function getDefaultComplex(env: Env) {
+  const db = getDb(env);
+  const result = await db.select().from(complex).limit(1);
 
   return result[0] || null;
 }
