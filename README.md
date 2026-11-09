@@ -51,6 +51,7 @@ Los horarios de reservas y partidos se guardan como **hora de pared del club** e
 | `create_booking` | Reserva un turno futuro para un booker registrado (`courtId`, `bookerPhoneNumber`, `datetime`); valida grilla y disponibilidad |
 | `is_booker_registered` / `register_booker` | Consulta / alta de quien reserva, identificado por teléfono |
 | `list_courts` / `get_court_status` | Canchas (filtrables por estado) y estado de una cancha puntual |
+| `get_court_location` | Ubicación, dirección, ciudad, coordenadas y link de Google Maps para una cancha específica o el complejo |
 | `get_open_matches` | Partidos que buscan jugadores, filtrables por fecha, cancha o categoría |
 | `create_match_from_booking` | Convierte una reserva futura en un partido abierto que busca jugadores (la reserva conserva su estado) |
 | `join_match` / `leave_match` | Sumar o quitar a un jugador de un partido |
