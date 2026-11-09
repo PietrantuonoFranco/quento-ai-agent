@@ -1,6 +1,11 @@
-import { getCourtById, getCourtByNumber, getAllCourts } from "../db/queries/courtQueries";
+import {
+  getCourtById,
+  getAllCourts,
+  getCourtWithComplexById,
+  getCourtWithComplexByNumber,
+  getDefaultComplex,
+} from "../db/queries/courtQueries";
 import { getCourtLocationInputSchema, getCourtStatusInputSchema, listCourtsInputSchema } from "../schemas/inputSchemas";
-import { CLUB_NAME, CLUB_ADDRESS, CLUB_CITY, CLUB_COORDINATES, CLUB_MAPS_URL } from "../lib/constants";
 import type Env from "../lib/interfaces/EnvInterface";
 import type Tool from "../lib/interfaces/ToolInterface";
 
@@ -31,21 +36,41 @@ export function getCourtTools(env: Env): Tool[] {
       description: "Gets the location, address, coordinates and Google Maps link for a specific court or the club complex",
       inputSchema: getCourtLocationInputSchema,
       execute: async (input) => {
-        let courtRow = null;
+        let match = null;
 
         if (input.courtId !== undefined) {
-          courtRow = await getCourtById(env, input.courtId);
+          match = await getCourtWithComplexById(env, input.courtId);
         } else if (input.name !== undefined) {
-          const match = input.name.match(/\d+/);
-          if (match) {
-            const courtNumber = parseInt(match[0], 10);
-            courtRow = await getCourtByNumber(env, courtNumber);
+          const numberMatch = input.name.match(/\d+/);
+          if (numberMatch) {
+            const courtNumber = parseInt(numberMatch[0], 10);
+            match = await getCourtWithComplexByNumber(env, courtNumber);
           }
+        } else {
+          const defaultComplex = await getDefaultComplex(env);
+          if (!defaultComplex) {
+            throw new Error("Complex location information not found");
+          }
+          return {
+            clubName: defaultComplex.name,
+            address: defaultComplex.address,
+            city: defaultComplex.city,
+            province: defaultComplex.province,
+            country: defaultComplex.country,
+            postalCode: defaultComplex.postalCode,
+            coordinates: {
+              latitude: Number(defaultComplex.latitude),
+              longitude: Number(defaultComplex.longitude),
+            },
+            googleMapsUrl: defaultComplex.mapsUrl,
+          };
         }
 
-        if (!courtRow) {
+        if (!match) {
           throw new Error("Court not found with the provided id or name");
         }
+
+        const { court: courtRow, complex: complexRow } = match;
 
         return {
           court: {
@@ -53,11 +78,17 @@ export function getCourtTools(env: Env): Tool[] {
             number: courtRow.number,
             name: `Cancha ${courtRow.number}`,
           },
-          clubName: CLUB_NAME,
-          address: CLUB_ADDRESS,
-          city: CLUB_CITY,
-          coordinates: CLUB_COORDINATES,
-          googleMapsUrl: CLUB_MAPS_URL,
+          clubName: complexRow.name,
+          address: complexRow.address,
+          city: complexRow.city,
+          province: complexRow.province,
+          country: complexRow.country,
+          postalCode: complexRow.postalCode,
+          coordinates: {
+            latitude: Number(complexRow.latitude),
+            longitude: Number(complexRow.longitude),
+          },
+          googleMapsUrl: complexRow.mapsUrl,
         };
       },
     },
