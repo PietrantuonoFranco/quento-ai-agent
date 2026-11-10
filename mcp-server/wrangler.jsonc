@@ -6,6 +6,7 @@
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "mcp",
 	"main": "src/index.ts",
+	"workers_dev": true,
 	"compatibility_date": "2025-09-27",
 	"compatibility_flags": [
 		"nodejs_compat"
@@ -16,7 +17,7 @@
 	"hyperdrive": [
 		{
 		  	"binding": "DB",
-		  	"id": "9be56aff0b44469fad9716255077023a",
+		  	"id": "590f235c3ff04009abd74f50d76eced6",
 		  	"localConnectionString": "postgresql://postgres:postgres@localhost:5432/devdb"
 		}
 	]
