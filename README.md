@@ -206,6 +206,24 @@ Requisitos previos en Cloudflare:
 wrangler secret put MCP_API_KEY
 ```
 
-Una vez desplegado, el Worker queda accesible en la URL pública que asigna Cloudflare, y se prueba igual que en local (mismos headers y mismo formato de requests), apuntando a esa URL en vez de `localhost:8787`.
+Una vez desplegado, el Worker queda accesible en la URL pública asignada por Cloudflare:
+`https://mcp.quento-padel.workers.dev`
 
-El **MCP Client** se despliega en Railway y es el que efectivamente consume el MCP Server en producción: recibe los webhooks de la WhatsApp API, mantiene la conversación con el LLM y llama al Worker desplegado usando la URL pública y el `MCP_API_KEY` de producción.
+Se puede verificar el estado del servicio:
+
+```bash
+curl https://mcp.quento-padel.workers.dev/health
+# ok
+```
+
+Y consultar las tools con autenticación:
+
+```bash
+curl -X POST https://mcp.quento-padel.workers.dev \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "x-api-key: <MCP_API_KEY>" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+El **MCP Client** (desplegado en Render / Railway) es el que efectivamente consume el MCP Server en producción: recibe los webhooks de la WhatsApp API, mantiene la conversación con el LLM y llama al Worker desplegado usando la URL pública `https://mcp.quento-padel.workers.dev` y el `MCP_API_KEY` de producción.
