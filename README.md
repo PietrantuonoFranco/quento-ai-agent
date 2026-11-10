@@ -188,35 +188,35 @@ GitHub Actions (`.github/workflows/tests.yml`) corre ambos conjuntos en cada pus
 
 Los tests del server viven en `mcp-server/test/` y los del host en `mcp-host/tests/`. No prueban contra Postgres real, Wrangler ni el Worker desplegado.
 
-## Probar / desplegar en la nube
+## Despliegue en la nube (Cloudflare Workers)
 
-El MCP Server se despliega como Cloudflare Worker:
+El **MCP Server** corre como un Worker en Cloudflare, conectado a Supabase a través de Hyperdrive.
 
-```bash
-cd mcp-server
-pnpm deploy   # wrangler deploy
-```
+* **URL del MCP Server desplegado:** `https://mcp.quento-padel.workers.dev`
+* **Binding de Hyperdrive (`DB`):** ID `590f235c3ff04009abd74f50d76eced6` (configurado en `mcp-server/wrangler.jsonc`), apuntando a la base de datos PostgreSQL de producción en Supabase.
 
-Requisitos previos en Cloudflare:
+### 1. Comandos para desplegar cambios en el Server
 
-- Un binding de **Hyperdrive** (`DB` en `wrangler.jsonc`) apuntando a la base de datos de producción (Supabase Postgres). El `id` del binding se configura desde el dashboard de Cloudflare o `wrangler hyperdrive create`.
-- El secreto `MCP_API_KEY` cargado con Wrangler (no se sube al repo):
+Desde `mcp-server/`:
 
 ```bash
+# Cargar o actualizar el secreto de autenticación en Cloudflare (solo si cambia la clave):
 wrangler secret put MCP_API_KEY
+
+# Desplegar el Worker a Cloudflare:
+pnpm deploy   # ejecuta wrangler deploy
 ```
 
-Una vez desplegado, el Worker queda accesible en la URL pública asignada por Cloudflare:
-`https://mcp.quento-padel.workers.dev`
+### 2. Verificar el servicio desplegado
 
-Se puede verificar el estado del servicio:
+Health check público:
 
 ```bash
 curl https://mcp.quento-padel.workers.dev/health
 # ok
 ```
 
-Y consultar las tools con autenticación:
+Consultar la lista de tools autenticada:
 
 ```bash
 curl -X POST https://mcp.quento-padel.workers.dev \
@@ -226,4 +226,15 @@ curl -X POST https://mcp.quento-padel.workers.dev \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```
 
-El **MCP Client** (desplegado en Render / Railway) es el que efectivamente consume el MCP Server en producción: recibe los webhooks de la WhatsApp API, mantiene la conversación con el LLM y llama al Worker desplegado usando la URL pública `https://mcp.quento-padel.workers.dev` y el `MCP_API_KEY` de producción.
+### 3. Conectar el MCP Host (Python / FastAPI)
+
+En `mcp-host/.env`:
+* **Para conectar el bot al servidor en la nube:**
+  ```env
+  MCP_SERVER_URL=https://mcp.quento-padel.workers.dev
+  MCP_API_KEY=<tu_clave_secreta>
+  ```
+* **Para desarrollo local de tools nuevas (sin desplegar a Cloudflare):**
+  ```env
+  MCP_SERVER_URL=http://localhost:8787
+  ```
