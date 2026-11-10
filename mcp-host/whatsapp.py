@@ -54,9 +54,28 @@ def parse_messages(payload: dict[str, Any]) -> list[IncomingMessage]:
     return result
 
 
+def _to_recipients(phone: str) -> list[str]:
+    """Meta's test sandbox in Argentina has quirks:
+    - AMBA (Buenos Aires, 54911) is registered by Meta as 541115...
+    - Other areas (e.g. 549221) are registered without the 9 (54221...)
+    - Or without transformation (549...)
+    Returns candidate formats to try in priority order."""
+    candidates: list[str] = []
+    if phone.startswith("54911"):
+        candidates.append("541115" + phone[5:])
+        candidates.append("54" + phone[3:])
+        candidates.append(phone)
+    elif phone.startswith("549"):
+        candidates.append("54" + phone[3:])
+        candidates.append(phone)
+    else:
+        candidates.append(phone)
+    return candidates
+
+
 def _to_recipient(phone: str) -> str:
-    """Webhooks report Argentine mobiles as 549...; the API's recipient list keeps them as 54... (error 131030)."""
-    return "54" + phone[3:] if phone.startswith("549") else phone
+    """Default candidate format for recipient phone."""
+    return _to_recipients(phone)[0]
 
 
 class Sender(Protocol):
@@ -70,14 +89,24 @@ class CloudApiSender:
         self._http = http or httpx.AsyncClient(timeout=15)
 
     async def send_text(self, phone: str, text: str) -> None:
-        body = {
-            "messaging_product": "whatsapp",
-            "to": _to_recipient(phone),
-            "type": "text",
-            "text": {"body": text[:MAX_TEXT_LENGTH]},
-        }
-        response = await self._http.post(self._url, json=body, headers=self._headers)
-        response.raise_for_status()
+        recipients = _to_recipients(phone)
+        last_response = None
+        for recipient in recipients:
+            body = {
+                "messaging_product": "whatsapp",
+                "to": recipient,
+                "type": "text",
+                "text": {"body": text[:MAX_TEXT_LENGTH]},
+            }
+            response = await self._http.post(self._url, json=body, headers=self._headers)
+            if not response.is_error:
+                return
+            last_response = response
+            logger.warning("Failed sending to %s: %s %s", recipient, response.status_code, response.text)
+
+        if last_response is not None:
+            logger.error("Meta API error for %s (all attempts failed): %s %s", phone, last_response.status_code, last_response.text)
+            last_response.raise_for_status()
 
     async def close(self) -> None:
         await self._http.aclose()
