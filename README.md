@@ -238,3 +238,38 @@ En `mcp-host/.env`:
   ```env
   MCP_SERVER_URL=http://localhost:8787
   ```
+
+## Despliegue del MCP Host (Render)
+
+El **MCP Host** corre en Render como Web Service utilizando el `Dockerfile` de `mcp-host/` (Python 3.12 + FastAPI + `uv`).
+
+* **URL del Host desplegado:** `https://quento-ai-agent.onrender.com`
+* **Health Check:** `GET /` (`{"status": "ok"}`)
+* **Webhook de WhatsApp:** `POST /webhook` (recibe y despacha mensajes entrantes)
+
+### Variables de entorno en Render
+
+| Variable | Descripción / Valor |
+|---|---|
+| `MCP_SERVER_URL` | `https://mcp.quento-padel.workers.dev` (apunta al Cloudflare Worker) |
+| `MCP_API_KEY` | Clave secreta compartida con Cloudflare |
+| `GEMINI_API_KEY` | Clave de Google AI Studio / Gemini |
+| `GEMINI_MODEL` | `gemini-3.6-flash` |
+| `WHATSAPP_DRY_RUN` | `true` (en modo prueba registra las respuestas en logs sin enviar a Meta) |
+| `WHATSAPP_APP_SECRET` | Secreto de la aplicación Meta para validar la firma `X-Hub-Signature-256` |
+
+### Pruebas del servicio desplegado
+
+1. Health check público:
+   ```bash
+   curl https://quento-ai-agent.onrender.com/
+   # {"status":"ok"}
+   ```
+
+2. Simulación de mensaje de WhatsApp hacia el servicio en Render:
+   ```bash
+   cd mcp-host
+   uv run python simulate.py "Hola, turnos para mañana" --url https://quento-ai-agent.onrender.com/webhook
+   ```
+   *(La respuesta generada por Gemini y Cloudflare se observa en los logs en vivo del servicio en Render)*.
+
