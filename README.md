@@ -47,16 +47,17 @@ Los horarios de reservas y partidos se guardan como **hora de pared del club** e
 | `get_available_bookings` | Turnos libres (descuenta reservas y períodos fuera de servicio) para una fecha (`date`, `YYYY-MM-DD`; **si se omite, hoy**) y opcionalmente una cancha (`courtId`) |
 | `get_available_times` | Horarios de inicio (`HH:MM`) con al menos una cancha libre en una fecha (hoy por defecto); cada horario aparece una sola vez aunque haya varias canchas |
 | `check_time_availability` | Consulta un horario puntual (`time`, `HH:MM`, y `date` opcional): indica si está disponible y qué canchas están libres; si no, devuelve los horarios alternativos del día |
-| `get_my_bookings` / `get_booking_details` | Reservas futuras de un teléfono / detalle de una reserva (cancha, hora, estado, partido); solo para su dueño |
-| `cancel_booking` / `reschedule_booking` | Cancela o mueve a otro horario (y opcionalmente otra cancha) una reserva futura; validan que el teléfono sea el dueño y que el turno nuevo esté libre |
+| `get_my_bookings` / `get_booking_details` | Reservas futuras de un teléfono / detalle de una reserva (cancha, hora, estado, partido); solo para su dueño. Marcan los turnos de clase (`isLesson`) y las fechas de turnos fijos (`fixedBookingId`) |
+| `cancel_booking` / `reschedule_booking` | Cancela o mueve a otro horario (y opcionalmente otra cancha) una reserva futura; validan que el teléfono sea el dueño y que el turno nuevo esté libre. Cancelar con menos de 3 h descuenta 20 puntos a quien tiene cuenta (salvo clases y turnos fijos). Una fecha de turno fijo se libera sola, sin dar de baja el turno fijo. Los turnos de clase se pueden cancelar pero no mover |
 | `get_club_info` | Cantidad de canchas por estado, horarios de apertura por día, duración del turno y zona horaria (no incluye precios ni política de cancelación) |
 | `create_booking` | Reserva un turno futuro para un booker registrado (`courtId`, `bookerPhoneNumber`, `datetime`); valida grilla y disponibilidad |
 | `is_booker_registered` / `register_booker` | Consulta / alta de quien reserva, identificado por teléfono |
 | `list_courts` / `get_court_status` | Canchas (filtrables por estado) y estado de una cancha puntual |
 | `get_court_location` | Ubicación, dirección, ciudad, coordenadas y link de Google Maps para una cancha específica o el complejo |
 | `get_open_matches` | Partidos que buscan jugadores, filtrables por fecha, cancha o categoría |
-| `create_match_from_booking` | Convierte una reserva futura en un partido abierto que busca jugadores (la reserva conserva su estado) |
-| `join_match` / `leave_match` | Sumar o quitar a un jugador de un partido |
+| `get_my_fixed_bookings` / `cancel_fixed_booking` | Turnos fijos activos de un teléfono (cancha, día, hora, frecuencia) / da de baja un turno fijo completo y cancela sus fechas futuras, sin penalización |
+| `create_match_from_booking` | Convierte una reserva futura en un partido abierto que busca jugadores (la reserva conserva su estado); no aplica a turnos de clase |
+| `join_match` / `leave_match` | Sumar o quitar del partido al jugador del teléfono. Bajarse con menos de 3 h descuenta 20 puntos a quien tiene cuenta y no reabre el lugar; quien creó el partido no se puede bajar |
 
 ### Estructura del repo
 

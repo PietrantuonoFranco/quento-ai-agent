@@ -71,6 +71,13 @@ export async function matchNeedsPlayers(env: Env, matchId: number) {
   return result[0]?.needPlayers ?? false;
 }
 
+// El partido vuelve a buscar jugadores (por ejemplo, cuando alguien libera su lugar).
+export async function reopenMatch(env: Env, matchId: number) {
+  const db = getDb(env);
+
+  await db.update(match).set({ needPlayers: true }).where(eq(match.id, matchId));
+}
+
 // Cierra el partido (deja de buscar jugadores) y devuelve la cantidad de jugadores anotados.
 export async function closeMatch(env: Env, matchId: number) {
   const db = getDb(env);

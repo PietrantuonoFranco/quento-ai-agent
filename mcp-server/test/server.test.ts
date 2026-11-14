@@ -51,6 +51,8 @@ const EXPECTED_TOOLS = [
   "leave_match",
   "create_match_from_booking",
   "get_club_info",
+  "get_my_fixed_bookings",
+  "cancel_fixed_booking",
 ];
 
 describe("registro de tools", () => {

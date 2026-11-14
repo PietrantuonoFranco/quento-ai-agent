@@ -4,11 +4,14 @@ vi.mock("../src/db/queries/matchQueries");
 vi.mock("../src/db/queries/bookingQueries");
 vi.mock("../src/db/queries/bookerQueries");
 vi.mock("../src/db/queries/matchPlayerQueries");
+vi.mock("../src/db/queries/penaltyQueries");
 
 import * as matchQueries from "../src/db/queries/matchQueries";
 import * as bookingQueries from "../src/db/queries/bookingQueries";
 import * as bookerQueries from "../src/db/queries/bookerQueries";
 import * as matchPlayerQueries from "../src/db/queries/matchPlayerQueries";
+import * as penaltyQueries from "../src/db/queries/penaltyQueries";
+import { LATE_LEAVE_REASON } from "../src/lib/penalties";
 import { getMatchTools } from "../src/tools/matchTools";
 import { NOW_UTC, TODAY, TOMORROW, at, bookingRow, callTool, env } from "./helpers";
 
@@ -47,24 +50,104 @@ describe("get_open_matches", () => {
   });
 });
 
-describe("join_match / leave_match", () => {
-  it("join_match suma al jugador al partido", async () => {
+describe("join_match", () => {
+  it("suma al partido al jugador del teléfono", async () => {
+    q(bookerQueries.getBookerByPhoneNumber).mockResolvedValue({ id: 4, type: "Player" } as any);
     q(matchQueries.addPlayerToMatch).mockResolvedValue({ matchId: 3, playerId: 4 } as any);
 
-    await call("join_match", { matchId: 3, playerId: 4 });
+    await call("join_match", { matchId: 3, phoneNumber: "5492222" });
 
+    expect(bookerQueries.getBookerByPhoneNumber).toHaveBeenCalledWith(env, "5492222");
     expect(matchQueries.addPlayerToMatch).toHaveBeenCalledWith(env, 3, 4);
   });
 
-  it("leave_match quita al jugador del partido", async () => {
-    await call("leave_match", { matchId: 3, playerId: 4 });
+  it("falla si el teléfono no está registrado", async () => {
+    q(bookerQueries.getBookerByPhoneNumber).mockResolvedValue(null as any);
 
-    expect(matchPlayerQueries.deleteMatchPlayer).toHaveBeenCalledWith(env, 3, 4);
+    await expect(call("join_match", { matchId: 3, phoneNumber: "5492222" })).rejects.toThrow("not registered");
+    expect(matchQueries.addPlayerToMatch).not.toHaveBeenCalled();
   });
 
-  it.each(["join_match", "leave_match"])("%s exige ids positivos", async (name) => {
-    await expect(call(name, { matchId: 0, playerId: 4 })).rejects.toThrow();
-    await expect(call(name, { matchId: 3 })).rejects.toThrow();
+  it("ya no acepta un playerId elegido por el modelo", () => {
+    const tool = tools.find((t) => t.name === "join_match")!;
+
+    expect(() => tool.inputSchema.parse({ matchId: 3, playerId: 4 })).toThrow();
+  });
+});
+
+describe("leave_match", () => {
+  const input = { matchId: 3, phoneNumber: "5492222" };
+
+  beforeEach(() => {
+    // El jugador 4 se sumó al partido 3, que es del turno 1 de otro jugador (booker 5).
+    q(bookerQueries.getBookerByPhoneNumber).mockResolvedValue({ id: 4, type: "Player" } as any);
+    q(matchPlayerQueries.getMatchPlayer).mockResolvedValue({ id: 11, matchId: 3, playerId: 4 } as any);
+    q(matchQueries.getMatchById).mockResolvedValue({ id: 3, bookingId: 1, needPlayers: false } as any);
+    q(bookingQueries.getBookingById).mockResolvedValue(bookingRow() as any);
+    q(penaltyQueries.recordPenalty).mockResolvedValue(-20);
+  });
+
+  it("quita al jugador del teléfono y el partido vuelve a buscar jugadores", async () => {
+    const result = await call("leave_match", input);
+
+    expect(matchPlayerQueries.getMatchPlayer).toHaveBeenCalledWith(env, 3, 4);
+    expect(matchPlayerQueries.deleteMatchPlayer).toHaveBeenCalledWith(env, 3, 4);
+    expect(matchQueries.reopenMatch).toHaveBeenCalledWith(env, 3);
+    expect(penaltyQueries.recordPenalty).not.toHaveBeenCalled();
+    expect(result).toEqual({ matchId: 3, left: true, pointsDeducted: 0 });
+  });
+
+  it("con menos de 3 horas penaliza y el partido queda como está", async () => {
+    q(bookingQueries.getBookingById).mockResolvedValue(bookingRow({ datetime: at(TODAY, "11:00") }) as any);
+
+    const result = await call("leave_match", input);
+
+    expect(matchPlayerQueries.deleteMatchPlayer).toHaveBeenCalledWith(env, 3, 4);
+    expect(penaltyQueries.recordPenalty).toHaveBeenCalledWith(env, 4, 20, LATE_LEAVE_REASON);
+    expect(matchQueries.reopenMatch).not.toHaveBeenCalled();
+    expect(result.pointsDeducted).toBe(20);
+  });
+
+  it("con menos de 3 horas no penaliza a quien no tiene cuenta", async () => {
+    q(bookingQueries.getBookingById).mockResolvedValue(bookingRow({ datetime: at(TODAY, "11:00") }) as any);
+    q(bookerQueries.getBookerByPhoneNumber).mockResolvedValue({ id: 4, type: "Booker" } as any);
+
+    const result = await call("leave_match", input);
+
+    expect(matchPlayerQueries.deleteMatchPlayer).toHaveBeenCalledWith(env, 3, 4);
+    expect(penaltyQueries.recordPenalty).not.toHaveBeenCalled();
+    expect(result.pointsDeducted).toBe(0);
+  });
+
+  it("usa el mismo error si el teléfono no está registrado o no está en el partido", async () => {
+    q(bookerQueries.getBookerByPhoneNumber).mockResolvedValueOnce(null as any);
+    const unregistered = await call("leave_match", input).catch((e) => e.message);
+
+    q(matchPlayerQueries.getMatchPlayer).mockResolvedValueOnce(null as any);
+    const notInMatch = await call("leave_match", input).catch((e) => e.message);
+
+    expect(unregistered).toBe("You are not a player of this match");
+    expect(notInMatch).toBe(unregistered);
+    expect(matchPlayerQueries.deleteMatchPlayer).not.toHaveBeenCalled();
+  });
+
+  it("quien creó el partido no se baja: tiene que cancelar el turno", async () => {
+    q(matchPlayerQueries.getMatchPlayer).mockResolvedValue({ id: 10, matchId: 3, playerId: 5 } as any);
+    q(bookerQueries.getBookerByPhoneNumber).mockResolvedValue({ id: 5, type: "Player" } as any);
+
+    await expect(call("leave_match", input)).rejects.toThrow("cancel the booking instead");
+    expect(matchPlayerQueries.deleteMatchPlayer).not.toHaveBeenCalled();
+  });
+
+  it("falla si el turno del partido está cancelado", async () => {
+    q(bookingQueries.getBookingById).mockResolvedValue(bookingRow({ bookingState: "cancelled" }) as any);
+
+    await expect(call("leave_match", input)).rejects.toThrow("already cancelled");
+    expect(matchPlayerQueries.deleteMatchPlayer).not.toHaveBeenCalled();
+  });
+
+  it("exige un matchId positivo", async () => {
+    await expect(call("leave_match", { matchId: 0, phoneNumber: "5492222" })).rejects.toThrow();
   });
 });
 
@@ -113,6 +196,13 @@ describe("create_match_from_booking", () => {
     q(bookingQueries.getBookingById).mockResolvedValue(bookingRow({ bookerId: 99 }) as any);
 
     await expect(call("create_match_from_booking", input)).rejects.toThrow("Booking not found");
+    expect(matchQueries.createMatch).not.toHaveBeenCalled();
+  });
+
+  it("falla si la reserva es un turno de clase", async () => {
+    q(bookingQueries.getBookingById).mockResolvedValue(bookingRow({ lessonId: 3 }) as any);
+
+    await expect(call("create_match_from_booking", input)).rejects.toThrow("belongs to a class");
     expect(matchQueries.createMatch).not.toHaveBeenCalled();
   });
 

@@ -186,17 +186,34 @@ export const getOpenMatchesInputSchema = z.object({
 });
 
 /**
- * Unirse a un partido abierto.
+ * Unirse a un partido abierto. El jugador es el dueño del teléfono (lo inyecta el host),
+ * nunca un id elegido por el modelo.
  */
 export const joinMatchInputSchema = z.object({
   matchId: z.number().int().positive().describe("The match ID to join"),
-  playerId: z.number().int().positive().describe("The player ID joining the match"),
+  phoneNumber: z.string().describe("Phone number of the player joining the match"),
 });
 
 /**
- * Salir de un partido del cual se es miembro.
+ * Salir de un partido del cual se es miembro (identificado por su teléfono).
  */
 export const leaveMatchInputSchema = z.object({
   matchId: z.number().int().positive().describe("The match ID to leave"),
-  playerId: z.number().int().positive().describe("The player ID leaving the match"),
+  phoneNumber: z.string().describe("Phone number of the player leaving the match"),
+});
+
+/**
+ * Listar los turnos fijos activos de un booker.
+ */
+export const getMyFixedBookingsInputSchema = z.object({
+  phoneNumber: z.string().describe("The booker's phone number"),
+});
+
+/**
+ * Dar de baja un turno fijo completo (solo su titular). Para cancelar una sola
+ * fecha se usa cancel_booking con el turno de esa fecha.
+ */
+export const cancelFixedBookingInputSchema = z.object({
+  fixedBookingId: z.number().int().positive().describe("The fixed booking ID (from get_my_fixed_bookings)"),
+  phoneNumber: z.string().describe("Phone number of the fixed booking's holder (must match)"),
 });

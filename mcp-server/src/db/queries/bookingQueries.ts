@@ -1,8 +1,9 @@
 import { getDb } from "../database";
-import { booker, booking } from "../schemas";
+import { booker, booking, fixedBookingDate } from "../schemas";
 import { and, asc, eq, getTableColumns, gte, ne, sql } from "drizzle-orm";
 import type Env from "../../lib/interfaces/EnvInterface";
 import BookingState from "../../lib/enums/bookingState";
+import FixedBookingDateState from "../../lib/enums/fixedBookingDateState";
 
 export async function getBookingById(env: Env, id: number) {
   const db = getDb(env);
@@ -65,13 +66,18 @@ export async function checkBookingAvailability(
 
 // Reservas no canceladas de un teléfono desde `from` (hora de pared del club) en adelante, ordenadas por fecha.
 // Los turnos referencian al booker por id, así que se resuelve el teléfono con un join.
+// fixedBookingId indica si el turno es una fecha de un turno fijo (null si no).
 export async function getUpcomingBookingsByPhone(env: Env, phoneNumber: string, from: Date) {
   const db = getDb(env);
 
   return db
-    .select(getTableColumns(booking))
+    .select({ ...getTableColumns(booking), fixedBookingId: fixedBookingDate.fixedBookingId })
     .from(booking)
     .innerJoin(booker, eq(booking.bookerId, booker.id))
+    .leftJoin(
+      fixedBookingDate,
+      and(eq(fixedBookingDate.bookingId, booking.id), eq(fixedBookingDate.state, FixedBookingDateState.BOOKED)),
+    )
     .where(
       and(
         eq(booker.phoneNumber, phoneNumber),

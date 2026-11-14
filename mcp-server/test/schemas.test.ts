@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { getTableConfig } from "drizzle-orm/pg-core";
 
-import { booking, bookingStateEnum, courtStateEnum, matchPlayer } from "../src/db/schemas";
+import {
+  booking,
+  bookingStateEnum,
+  courtStateEnum,
+  fixedBooking,
+  fixedBookingDate,
+  fixedBookingDateStateEnum,
+  fixedBookingFrequencyEnum,
+  matchPlayer,
+  penalty,
+} from "../src/db/schemas";
 
 // El esquema lo migra la web (padel-quento, TypeORM). Drizzle lista en cada SELECT
 // todas las columnas declaradas, así que una columna que la web ya borró rompe
@@ -52,5 +62,49 @@ describe("schema de match_players", () => {
 describe("schema de courts", () => {
   it("usa los estados available y closed_down", () => {
     expect(courtStateEnum.enumValues).toEqual(["available", "closed_down"]);
+  });
+});
+
+describe("schema de penalties", () => {
+  it("tiene las columnas actuales de la web", () => {
+    expect(columnsOf(penalty)).toEqual(
+      ["id", "player_id", "booking_id", "penalized_scoring", "reason", "created_at"].sort(),
+    );
+  });
+});
+
+describe("schema de fixed_bookings", () => {
+  it("tiene las columnas actuales de la web", () => {
+    expect(columnsOf(fixedBooking)).toEqual(
+      [
+        "id",
+        "court_id",
+        "booker_id",
+        "start_date",
+        "end_date",
+        "start_time",
+        "duration_minutes",
+        "frequency",
+        "is_active",
+        "created_at",
+      ].sort(),
+    );
+  });
+
+  it("usa las frecuencias weekly y biweekly", () => {
+    expect(getTableConfig(fixedBooking).columns.find((c) => c.name === "frequency")).toBeDefined();
+    expect(fixedBookingFrequencyEnum.enumName).toBe("fixed_bookings_frequency_enum");
+    expect(fixedBookingFrequencyEnum.enumValues).toEqual(["weekly", "biweekly"]);
+  });
+});
+
+describe("schema de fixed_booking_dates", () => {
+  it("tiene las columnas actuales de la web", () => {
+    expect(columnsOf(fixedBookingDate)).toEqual(["id", "fixed_booking_id", "date", "state", "booking_id"].sort());
+  });
+
+  it("usa los estados booked, released y conflict", () => {
+    expect(fixedBookingDateStateEnum.enumName).toBe("fixed_booking_dates_state_enum");
+    expect(fixedBookingDateStateEnum.enumValues).toEqual(["booked", "released", "conflict"]);
   });
 });

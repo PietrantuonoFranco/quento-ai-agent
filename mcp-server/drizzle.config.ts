@@ -11,7 +11,19 @@ dotenv.config();
 export default defineConfig({
   schema: "./src/db/schemas/index.ts",
   dialect: "postgresql",
-  tablesFilter: ["bookers", "bookings", "courts", "matches", "match_players", "out_of_services", "schedules"],
+  tablesFilter: [
+    "bookers",
+    "bookings",
+    "complexes",
+    "courts",
+    "fixed_bookings",
+    "fixed_booking_dates",
+    "matches",
+    "match_players",
+    "out_of_services",
+    "penalties",
+    "schedules",
+  ],
   dbCredentials: {
     url: process.env.DATABASE_URL!,
     ssl: { rejectUnauthorized: false }

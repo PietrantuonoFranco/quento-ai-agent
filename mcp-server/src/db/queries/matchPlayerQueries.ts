@@ -15,6 +15,17 @@ export async function getMatchPlayersByPlayerId(env: Env, playerId: number) {
   return db.select().from(matchPlayer).where(eq(matchPlayer.playerId, playerId));
 }
 
+export async function getMatchPlayer(env: Env, matchId: number, playerId: number) {
+  const db = getDb(env);
+  const result = await db
+    .select()
+    .from(matchPlayer)
+    .where(and(eq(matchPlayer.matchId, matchId), eq(matchPlayer.playerId, playerId)))
+    .limit(1);
+
+  return result[0] || null;
+}
+
 export async function createMatchPlayer(env: Env, values: typeof matchPlayer.$inferInsert) {
   const db = getDb(env);
   const result = await db.insert(matchPlayer).values(values).returning();

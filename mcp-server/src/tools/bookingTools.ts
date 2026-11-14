@@ -11,6 +11,8 @@ import { getMatchByBookingId } from "../db/queries/matchQueries";
 import { getBookerByPhoneNumber } from "../db/queries/bookerQueries";
 import { getCourtById, getAllCourts, checkCourtAvailability } from "../db/queries/courtQueries";
 import { getScheduleByCourtIdAndDay, getSchedulesByDay } from "../db/queries/scheduleQueries";
+import { recordPenalty } from "../db/queries/penaltyQueries";
+import { getBookedFixedBookingDateByBookingId, releaseFixedBookingDate } from "../db/queries/fixedBookingQueries";
 import {
   getAvailableBookingsInputSchema,
   getAvailableTimesInputSchema,
@@ -24,6 +26,8 @@ import {
 import BookingState from "../lib/enums/bookingState";
 import CourtState from "../lib/enums/courtState";
 import DayOfWeek from "../lib/enums/dayOfWeek";
+import BookerType from "../lib/enums/bookerType";
+import { LATE_CANCELLATION_REASON, PENALTY_POINTS, isLateCancellation } from "../lib/penalties";
 import { BOOKING_DURATION_MINUTES } from "../lib/constants";
 import { todayInClubTimezone, nowInClubTime } from "../lib/clubTime";
 import type Env from "../lib/interfaces/EnvInterface";
@@ -139,8 +143,8 @@ function parseClubDatetime(value: string): Date {
   return datetime;
 }
 
-// Devuelve la reserva si existe y pertenece al booker de ese teléfono; si no, falla con el mismo
-// mensaje para no revelar reservas de otras personas.
+// Devuelve la reserva (y su booker) si existe y pertenece al booker de ese teléfono; si no,
+// falla con el mismo mensaje para no revelar reservas de otras personas.
 async function getOwnedBooking(env: Env, bookingId: number, phoneNumber: string) {
   const [bookingRow, bookerRow] = await Promise.all([
     getBookingById(env, bookingId),
@@ -151,7 +155,37 @@ async function getOwnedBooking(env: Env, bookingId: number, phoneNumber: string)
     throw new Error("Booking not found for this phone number");
   }
 
-  return bookingRow;
+  return { bookingRow, bookerRow };
+}
+
+// Cancela un turno con las reglas de la web: una fecha de turno fijo se libera (sin dar de baja
+// el turno fijo) y nunca penaliza; un turno de clase tampoco. En el resto, cancelar con menos de
+// LATE_CANCELLATION_HOURS penaliza a quien reservó, solo si tiene cuenta (es un Player).
+async function cancelOwnedBooking(
+  env: Env,
+  bookingRow: { id: number; datetime: Date; lessonId: number | null },
+  bookerRow: { id: number; type: string },
+) {
+  const fixedDate = await getBookedFixedBookingDateByBookingId(env, bookingRow.id);
+
+  if (fixedDate) {
+    await releaseFixedBookingDate(env, fixedDate.id, bookingRow.id);
+
+    return { pointsDeducted: 0, fixedBookingId: fixedDate.fixedBookingId };
+  }
+
+  await cancelBooking(env, bookingRow.id);
+
+  const penalized =
+    bookingRow.lessonId === null &&
+    bookerRow.type === BookerType.PLAYER &&
+    isLateCancellation(bookingRow.datetime, nowInClubTime());
+
+  if (!penalized) return { pointsDeducted: 0 };
+
+  const amount = await recordPenalty(env, bookerRow.id, PENALTY_POINTS, LATE_CANCELLATION_REASON);
+
+  return { pointsDeducted: Math.abs(amount) };
 }
 
 function assertModifiable(bookingRow: { bookingState: string; datetime: Date }) {
@@ -265,7 +299,8 @@ export function getBookingTools(env: Env): Tool[] {
     },
     {
       name: "get_my_bookings",
-      description: "Lists the upcoming (not cancelled) bookings of a booker, identified by phone number",
+      description:
+        "Lists the upcoming (not cancelled) bookings of a booker, identified by phone number. isLesson marks the sessions of a class they teach; fixedBookingId marks the dates of one of their fixed (recurring) bookings",
       inputSchema: getMyBookingsInputSchema,
       execute: async (input) => {
         const bookings = await getUpcomingBookingsByPhone(env, input.phoneNumber, nowInClubTime());
@@ -278,6 +313,8 @@ export function getBookingTools(env: Env): Tool[] {
           datetime: b.datetime.toISOString(),
           durationMinutes: b.durationMinutes,
           bookingState: b.bookingState,
+          isLesson: b.lessonId !== null,
+          fixedBookingId: b.fixedBookingId,
         }));
       },
     },
@@ -286,7 +323,7 @@ export function getBookingTools(env: Env): Tool[] {
       description: "Returns the details of one booking (court, time, state and match info) for its owner",
       inputSchema: getBookingDetailsInputSchema,
       execute: async (input) => {
-        const bookingRow = await getOwnedBooking(env, input.bookingId, input.phoneNumber);
+        const { bookingRow } = await getOwnedBooking(env, input.bookingId, input.phoneNumber);
         const courtRow = bookingRow.courtId !== null ? await getCourtById(env, bookingRow.courtId) : null;
         const matchRow = await getMatchByBookingId(env, bookingRow.id);
 
@@ -297,33 +334,45 @@ export function getBookingTools(env: Env): Tool[] {
           datetime: bookingRow.datetime.toISOString(),
           durationMinutes: bookingRow.durationMinutes,
           bookingState: bookingRow.bookingState,
+          isLesson: bookingRow.lessonId !== null,
           match: matchRow ? { matchId: matchRow.id, needPlayers: matchRow.needPlayers } : null,
         };
       },
     },
     {
       name: "cancel_booking",
-      description: "Cancels an upcoming booking; only its owner (matching phone number) can cancel it",
+      description:
+        "Cancels an upcoming booking; only its owner (matching phone number) can cancel it. Cancelling less than 3 hours before the start deducts 20 loyalty points from players with an account (pointsDeducted), except for class sessions and fixed booking dates. For a date of a fixed booking it cancels only that date; use cancel_fixed_booking to cancel the whole fixed booking",
       inputSchema: cancelBookingInputSchema,
       execute: async (input) => {
-        const bookingRow = await getOwnedBooking(env, input.bookingId, input.phoneNumber);
+        const { bookingRow, bookerRow } = await getOwnedBooking(env, input.bookingId, input.phoneNumber);
 
         assertModifiable(bookingRow);
 
-        const cancelled = await cancelBooking(env, bookingRow.id);
+        const outcome = await cancelOwnedBooking(env, bookingRow, bookerRow);
 
-        return { bookingId: bookingRow.id, bookingState: cancelled?.bookingState, datetime: bookingRow.datetime.toISOString() };
+        return {
+          bookingId: bookingRow.id,
+          bookingState: BookingState.CANCELLED,
+          datetime: bookingRow.datetime.toISOString(),
+          ...outcome,
+        };
       },
     },
     {
       name: "reschedule_booking",
       description:
-        "Moves an upcoming booking to a new start time (and optionally another court) if that slot is free; only the owner can do it",
+        "Moves an upcoming booking to a new start time (and optionally another court) if that slot is free; only the owner can do it. Class sessions cannot be moved",
       inputSchema: rescheduleBookingInputSchema,
       execute: async (input) => {
-        const bookingRow = await getOwnedBooking(env, input.bookingId, input.phoneNumber);
+        const { bookingRow } = await getOwnedBooking(env, input.bookingId, input.phoneNumber);
 
         assertModifiable(bookingRow);
+
+        // Moverla la desalinearía del horario de la clase (lesson_schedules) y de sus alumnos.
+        if (bookingRow.lessonId !== null) {
+          throw new Error("This booking belongs to a class and cannot be moved; it can only be cancelled");
+        }
 
         const courtId = input.courtId ?? bookingRow.courtId;
         const datetime = parseClubDatetime(input.newDatetime);

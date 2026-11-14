@@ -29,6 +29,7 @@ export function bookingRow(overrides: Record<string, unknown> = {}) {
     id: 1,
     courtId: 1,
     bookerId: 5,
+    lessonId: null,
     datetime: at(TOMORROW, "12:00"),
     durationMinutes: 90,
     bookingState: "reserved",
