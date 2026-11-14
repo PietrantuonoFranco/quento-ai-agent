@@ -25,7 +25,7 @@ const tools = getBookingTools(env);
 const call = (name: string, args: Record<string, unknown> = {}) => callTool(tools, name, args);
 
 const court1 = { id: 1, number: 1, state: "available", price: "20000.00" };
-const court2 = { id: 2, number: 2, state: "available", price: "20000.00" };
+const court2 = { id: 2, number: 2, state: "available", price: "22000.00" };
 
 // Grilla de 90' con apertura 09:00 y cierre 23:00 (el último turno que entra arranca 21:00).
 const FULL_GRID = ["09:00", "10:30", "12:00", "13:30", "15:00", "16:30", "18:00", "19:30", "21:00"];
@@ -64,7 +64,8 @@ describe("get_available_bookings", () => {
     expect(result).toHaveLength(2);
     expect(slotsOf(result, 1)).toEqual(FULL_GRID);
     expect(slotsOf(result, 2)).toEqual(FULL_GRID);
-    expect(result[0]).toMatchObject({ courtId: 1, courtNumber: 1 });
+    expect(result[0]).toMatchObject({ courtId: 1, courtNumber: 1, price: 20000 });
+    expect(result[1]).toMatchObject({ courtId: 2, courtNumber: 2, price: 22000 });
     expect(result[0].slots[0]).toBe(`${TOMORROW}T09:00:00.000Z`);
   });
 
@@ -278,8 +279,8 @@ describe("check_time_availability", () => {
       time: "13:30",
       available: true,
       courts: [
-        { courtId: 1, courtNumber: 1 },
-        { courtId: 2, courtNumber: 2 },
+        { courtId: 1, courtNumber: 1, price: 20000 },
+        { courtId: 2, courtNumber: 2, price: 22000 },
       ],
     });
   });
@@ -292,7 +293,7 @@ describe("check_time_availability", () => {
     const result = await call("check_time_availability", { date: TOMORROW, time: "13:30" });
 
     expect(result.available).toBe(true);
-    expect(result.courts).toEqual([{ courtId: 2, courtNumber: 2 }]);
+    expect(result.courts).toEqual([{ courtId: 2, courtNumber: 2, price: 22000 }]);
   });
 
   it("si está ocupado devuelve available=false y los horarios alternativos", async () => {
@@ -437,6 +438,7 @@ describe("get_my_bookings", () => {
         datetime: `${TOMORROW}T15:00:00.000Z`,
         durationMinutes: 90,
         bookingState: "reserved",
+        price: 20000,
         isLesson: false,
         fixedBookingId: null,
       },
@@ -447,6 +449,7 @@ describe("get_my_bookings", () => {
         datetime: `${TOMORROW}T18:00:00.000Z`,
         durationMinutes: 90,
         bookingState: "reserved",
+        price: 20000,
         isLesson: true,
         fixedBookingId: null,
       },
@@ -457,6 +460,7 @@ describe("get_my_bookings", () => {
         datetime: `${TOMORROW}T21:00:00.000Z`,
         durationMinutes: 90,
         bookingState: "reserved",
+        price: 20000,
         isLesson: false,
         fixedBookingId: 4,
       },
@@ -476,7 +480,14 @@ describe("get_booking_details", () => {
 
     const result = await call("get_booking_details", { bookingId: 1, phoneNumber: "5491111" });
 
-    expect(result).toMatchObject({ bookingId: 1, courtId: 1, courtNumber: 1, bookingState: "reserved", match: null });
+    expect(result).toMatchObject({
+      bookingId: 1,
+      courtId: 1,
+      courtNumber: 1,
+      bookingState: "reserved",
+      price: 20000,
+      match: null,
+    });
   });
 
   it("incluye los datos del partido si existe", async () => {

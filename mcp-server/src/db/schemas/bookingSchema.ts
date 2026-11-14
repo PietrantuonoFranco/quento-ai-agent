@@ -2,6 +2,7 @@ import { pgTable, pgEnum, serial, integer, numeric, timestamp, boolean } from "d
 
 import { court } from "./courtSchema";
 import { booker } from "./bookerSchema";
+import { lesson } from "./lessonSchema";
 import BookingState from "../../lib/enums/bookingState";
 
 
@@ -15,8 +16,7 @@ export const booking = pgTable("bookings", {
   courtId: integer("court_id").references(() => court.id),
   bookerId: integer("booker_id").references(() => booker.id),
   // Clase a la que pertenece el turno (lo reservó el profesor); null en cualquier otro turno.
-  // La FK a lessons no se declara porque el bot todavía no usa esa tabla.
-  lessonId: integer("lesson_id"),
+  lessonId: integer("lesson_id").references(() => lesson.id),
 
   bookingState: bookingStateEnum("booking_state").notNull(),
   datetime: timestamp("datetime", { mode: 'date' }).notNull(),

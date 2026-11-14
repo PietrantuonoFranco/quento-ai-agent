@@ -120,7 +120,7 @@ async function collectAvailability(env: Env, date: string, courtId?: number) {
     }
 
     if (slots.length > 0) {
-      availability.push({ courtId: courtRow.id, courtNumber: courtRow.number, slots });
+      availability.push({ courtId: courtRow.id, courtNumber: courtRow.number, price: Number(courtRow.price), slots });
     }
   }
 
@@ -216,7 +216,7 @@ export function getBookingTools(env: Env): Tool[] {
     {
       name: "get_available_bookings",
       description:
-        "Lists available fixed-length booking slots for a given date (today if omitted), optionally for a specific court",
+        "Lists available fixed-length booking slots for a given date (today if omitted), optionally for a specific court, with each court's price per booking",
       inputSchema: getAvailableBookingsInputSchema,
       execute: async (input) => {
         return collectAvailability(env, input.date ?? todayInClubTimezone(), input.courtId);
@@ -238,14 +238,14 @@ export function getBookingTools(env: Env): Tool[] {
     {
       name: "check_time_availability",
       description:
-        "Checks whether a specific start time (HH:MM) is bookable on a given date (today if omitted) and which courts are free at that time. If it is not available, returns the other available times that day",
+        "Checks whether a specific start time (HH:MM) is bookable on a given date (today if omitted) and which courts are free at that time (with their price per booking). If it is not available, returns the other available times that day",
       inputSchema: checkTimeAvailabilityInputSchema,
       execute: async (input) => {
         const date = input.date ?? todayInClubTimezone();
         const availability = await collectAvailability(env, date);
         const courts = availability
           .filter((court) => court.slots.some((slot) => slotToTime(slot) === input.time))
-          .map(({ courtId, courtNumber }) => ({ courtId, courtNumber }));
+          .map(({ courtId, courtNumber, price }) => ({ courtId, courtNumber, price }));
 
         if (courts.length > 0) {
           return { date, time: input.time, available: true, courts };
@@ -313,6 +313,7 @@ export function getBookingTools(env: Env): Tool[] {
           datetime: b.datetime.toISOString(),
           durationMinutes: b.durationMinutes,
           bookingState: b.bookingState,
+          price: Number(b.price),
           isLesson: b.lessonId !== null,
           fixedBookingId: b.fixedBookingId,
         }));
@@ -334,6 +335,7 @@ export function getBookingTools(env: Env): Tool[] {
           datetime: bookingRow.datetime.toISOString(),
           durationMinutes: bookingRow.durationMinutes,
           bookingState: bookingRow.bookingState,
+          price: Number(bookingRow.price),
           isLesson: bookingRow.lessonId !== null,
           match: matchRow ? { matchId: matchRow.id, needPlayers: matchRow.needPlayers } : null,
         };

@@ -6,7 +6,8 @@ config:
 %% Copia del DER de padel-quento (docs/der/der.mmd en main, commit a61c57b), que es la fuente de verdad:
 %% la web crea y migra la base. der.jpg es el render de la web. Si cambia allá, volver a copiar ambos archivos.
 %% Tablas que el bot espeja con Drizzle (mcp-server/src/db/schemas): bookers, bookings, complexes, courts,
-%% matches, match_players, out_of_services, schedules.
+%% fixed_bookings, fixed_booking_dates, inscriptions, lessons, lesson_schedules, matches, match_players,
+%% out_of_services, penalties, schedules.
 %% Table and column names follow the database (snake_case).
 %% Keys: PK primary key, FK foreign key, UK unique. Nullable columns are marked "nullable".
 %% Composite constraints and indexes:

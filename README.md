@@ -33,8 +33,11 @@ Entidades principales que usa el bot:
 - **courts**, **schedules**, **out_of_services**: canchas (con su precio), horarios de apertura/cierre por día y períodos fuera de servicio.
 - **bookings**: reservas de cancha asociadas a un `booker` (`booker_id`), un horario y el precio de la cancha al reservar. Los turnos de una clase tienen `lesson_id`.
 - **matches / match_players**: partidos abiertos a partir de una reserva y los jugadores anotados.
+- **fixed_bookings / fixed_booking_dates**: turnos fijos (misma cancha y hora cada semana o cada dos) y cada fecha reservada.
+- **lessons / lesson_schedules / inscriptions**: clases de los profesores, sus horarios semanales y los alumnos inscriptos.
+- **penalties**: movimientos de puntos de los jugadores (las penalizaciones por cancelar o bajarse tarde).
 
-> **El esquema es de la web.** La base la crea y migra la web de Quento (`padel-quento`, Next.js + TypeORM). En el bot, `mcp-server/src/db/schemas/*.ts` es un espejo en Drizzle (Cloudflare Workers no se lleva bien con TypeORM) de **solo las tablas que usa el bot**; el resto (cuentas, admins, chats, penalizaciones, turnos fijos, reseñas, clases e inscripciones) existe en la base pero no se declara acá. Los estados son enums de Postgres cuyos valores replican `mcp-server/src/lib/enums/`. Si la web cambia una de estas tablas, hay que actualizar el schema correspondiente a mano.
+> **El esquema es de la web.** La base la crea y migra la web de Quento (`padel-quento`, Next.js + TypeORM). En el bot, `mcp-server/src/db/schemas/*.ts` es un espejo en Drizzle (Cloudflare Workers no se lleva bien con TypeORM) de **solo las tablas que usa el bot**; el resto (cuentas, admins, chats, mensajes y reseñas) existe en la base pero no se declara acá. Los estados son enums de Postgres cuyos valores replican `mcp-server/src/lib/enums/`. Si la web cambia una de estas tablas, hay que actualizar el schema correspondiente a mano.
 
 ### Convención de fechas
 
@@ -44,18 +47,20 @@ Los horarios de reservas y partidos se guardan como **hora de pared del club** e
 
 | Tool | Descripción |
 |---|---|
-| `get_available_bookings` | Turnos libres (descuenta reservas y períodos fuera de servicio) para una fecha (`date`, `YYYY-MM-DD`; **si se omite, hoy**) y opcionalmente una cancha (`courtId`) |
+| `get_available_bookings` | Turnos libres (descuenta reservas y períodos fuera de servicio) para una fecha (`date`, `YYYY-MM-DD`; **si se omite, hoy**) y opcionalmente una cancha (`courtId`), con el precio del turno en cada cancha |
 | `get_available_times` | Horarios de inicio (`HH:MM`) con al menos una cancha libre en una fecha (hoy por defecto); cada horario aparece una sola vez aunque haya varias canchas |
-| `check_time_availability` | Consulta un horario puntual (`time`, `HH:MM`, y `date` opcional): indica si está disponible y qué canchas están libres; si no, devuelve los horarios alternativos del día |
+| `check_time_availability` | Consulta un horario puntual (`time`, `HH:MM`, y `date` opcional): indica si está disponible y qué canchas están libres; si no, devuelve los horarios alternativos del día. Incluye el precio de cada cancha |
 | `get_my_bookings` / `get_booking_details` | Reservas futuras de un teléfono / detalle de una reserva (cancha, hora, estado, partido); solo para su dueño. Marcan los turnos de clase (`isLesson`) y las fechas de turnos fijos (`fixedBookingId`) |
 | `cancel_booking` / `reschedule_booking` | Cancela o mueve a otro horario (y opcionalmente otra cancha) una reserva futura; validan que el teléfono sea el dueño y que el turno nuevo esté libre. Cancelar con menos de 3 h descuenta 20 puntos a quien tiene cuenta (salvo clases y turnos fijos). Una fecha de turno fijo se libera sola, sin dar de baja el turno fijo. Los turnos de clase se pueden cancelar pero no mover |
-| `get_club_info` | Cantidad de canchas por estado, horarios de apertura por día, duración del turno y zona horaria (no incluye precios ni política de cancelación) |
+| `get_club_info` | Cantidad de canchas por estado, horarios de apertura por día, duración del turno y zona horaria |
 | `create_booking` | Reserva un turno futuro para un booker registrado (`courtId`, `bookerPhoneNumber`, `datetime`); valida grilla y disponibilidad |
 | `is_booker_registered` / `register_booker` | Consulta / alta de quien reserva, identificado por teléfono |
 | `list_courts` / `get_court_status` | Canchas (filtrables por estado) y estado de una cancha puntual |
 | `get_court_location` | Ubicación, dirección, ciudad, coordenadas y link de Google Maps para una cancha específica o el complejo |
 | `get_open_matches` | Partidos que buscan jugadores, filtrables por fecha, cancha o categoría |
 | `get_my_fixed_bookings` / `cancel_fixed_booking` | Turnos fijos activos de un teléfono (cancha, día, hora, frecuencia) / da de baja un turno fijo completo y cancela sus fechas futuras, sin penalización |
+| `get_available_lessons` / `get_my_lessons` | Clases abiertas (profesor, precio, cupo y lugares libres, fechas, horarios semanales), marcando en cuáles está inscripto el cliente y cuáles da / solo las clases en las que está inscripto |
+| `enroll_in_lesson` / `leave_lesson` | Inscribe al cliente en una clase (solo jugadores con cuenta; clase activa, no terminada y con cupo; el profesor no se anota en la suya) / lo da de baja, sin penalización |
 | `create_match_from_booking` | Convierte una reserva futura en un partido abierto que busca jugadores (la reserva conserva su estado); no aplica a turnos de clase |
 | `join_match` / `leave_match` | Sumar o quitar del partido al jugador del teléfono. Bajarse con menos de 3 h descuenta 20 puntos a quien tiene cuenta y no reabre el lugar; quien creó el partido no se puede bajar |
 

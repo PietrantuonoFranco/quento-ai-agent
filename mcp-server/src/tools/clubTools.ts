@@ -11,7 +11,7 @@ export function getClubTools(env: Env): Tool[] {
     {
       name: "get_club_info",
       description:
-        "General club information: number of courts by state, opening hours per day of the week, slot duration and timezone. Does not include prices or cancellation policy",
+        "General club information: number of courts by state, opening hours per day of the week, slot duration and timezone. Court prices come with get_available_bookings and check_time_availability",
       inputSchema: getClubInfoInputSchema,
       execute: async () => {
         const courts = await getAllCourts(env);

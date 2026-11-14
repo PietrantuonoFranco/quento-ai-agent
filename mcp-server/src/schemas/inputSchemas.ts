@@ -217,3 +217,36 @@ export const cancelFixedBookingInputSchema = z.object({
   fixedBookingId: z.number().int().positive().describe("The fixed booking ID (from get_my_fixed_bookings)"),
   phoneNumber: z.string().describe("Phone number of the fixed booking's holder (must match)"),
 });
+
+/**
+ * Listar las clases abiertas (activas y no terminadas). El teléfono marca en cuáles está
+ * inscripto el cliente y cuáles da como profesor.
+ */
+export const getAvailableLessonsInputSchema = z.object({
+  phoneNumber: z.string().describe("The customer's phone number"),
+});
+
+/**
+ * Listar las clases en las que está inscripto el cliente.
+ */
+export const getMyLessonsInputSchema = z.object({
+  phoneNumber: z.string().describe("The customer's phone number"),
+});
+
+const lessonIdSchema = z.number().int().positive().describe("The class ID (from get_available_lessons)");
+
+/**
+ * Inscribirse en una clase (solo jugadores con cuenta).
+ */
+export const enrollInLessonInputSchema = z.object({
+  lessonId: lessonIdSchema,
+  phoneNumber: z.string().describe("Phone number of the player enrolling"),
+});
+
+/**
+ * Darse de baja de una clase.
+ */
+export const leaveLessonInputSchema = z.object({
+  lessonId: lessonIdSchema,
+  phoneNumber: z.string().describe("Phone number of the enrolled player"),
+});

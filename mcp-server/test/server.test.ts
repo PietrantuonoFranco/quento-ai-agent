@@ -53,6 +53,10 @@ const EXPECTED_TOOLS = [
   "get_club_info",
   "get_my_fixed_bookings",
   "cancel_fixed_booking",
+  "get_available_lessons",
+  "get_my_lessons",
+  "enroll_in_lesson",
+  "leave_lesson",
 ];
 
 describe("registro de tools", () => {

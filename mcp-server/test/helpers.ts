@@ -33,6 +33,7 @@ export function bookingRow(overrides: Record<string, unknown> = {}) {
     datetime: at(TOMORROW, "12:00"),
     durationMinutes: 90,
     bookingState: "reserved",
+    price: "20000.00",
     ...overrides,
   };
 }

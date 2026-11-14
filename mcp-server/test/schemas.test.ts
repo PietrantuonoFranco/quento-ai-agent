@@ -9,6 +9,10 @@ import {
   fixedBookingDate,
   fixedBookingDateStateEnum,
   fixedBookingFrequencyEnum,
+  inscription,
+  lesson,
+  lessonSchedule,
+  lessonScheduleDayOfWeekEnum,
   matchPlayer,
   penalty,
 } from "../src/db/schemas";
@@ -106,5 +110,49 @@ describe("schema de fixed_booking_dates", () => {
   it("usa los estados booked, released y conflict", () => {
     expect(fixedBookingDateStateEnum.enumName).toBe("fixed_booking_dates_state_enum");
     expect(fixedBookingDateStateEnum.enumValues).toEqual(["booked", "released", "conflict"]);
+  });
+});
+
+describe("schema de lessons", () => {
+  it("tiene las columnas actuales de la web", () => {
+    expect(columnsOf(lesson)).toEqual(
+      [
+        "id",
+        "teacher_id",
+        "class_capacity",
+        "is_active",
+        "created_at",
+        "from_local_datetime",
+        "to_local_datetime",
+        "price",
+      ].sort(),
+    );
+  });
+
+  it("bookings.lesson_id referencia a lessons", () => {
+    const foreignKey = getTableConfig(booking).foreignKeys.find((fk) =>
+      fk.reference().columns.some((column) => column.name === "lesson_id"),
+    );
+
+    expect(foreignKey).toBeDefined();
+    expect(getTableConfig(foreignKey!.reference().foreignTable).name).toBe("lessons");
+  });
+});
+
+describe("schema de lesson_schedules", () => {
+  it("tiene las columnas actuales de la web", () => {
+    expect(columnsOf(lessonSchedule)).toEqual(
+      ["id", "lesson_id", "court_id", "day_of_week", "start_time", "end_time"].sort(),
+    );
+  });
+
+  it("usa su propio enum de días", () => {
+    expect(lessonScheduleDayOfWeekEnum.enumName).toBe("lesson_schedules_day_of_week_enum");
+  });
+});
+
+describe("schema de inscriptions", () => {
+  it("tiene las columnas actuales de la web", () => {
+    expect(columnsOf(inscription)).toEqual(["id", "lesson_id", "player_id", "created_at"].sort());
   });
 });

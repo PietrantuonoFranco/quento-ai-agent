@@ -15,3 +15,4 @@ export {
   fixedBookingFrequencyEnum,
   fixedBookingDateStateEnum,
 } from "./fixedBookingSchema";
+export { lesson, lessonSchedule, inscription, lessonScheduleDayOfWeekEnum } from "./lessonSchema";
