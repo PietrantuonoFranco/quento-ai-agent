@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { asc } from "drizzle-orm";
 
 import * as schema from "../schemas";
 import CourtState from "../../lib/enums/courtState";
@@ -26,9 +27,24 @@ async function seed() {
     return;
   }
 
+  // El complejo lo crea la migración AddComplexes de la web; igual que ella, las canchas van al de menor id.
+  const [complexRow] = await db.select().from(schema.complex).orderBy(asc(schema.complex.id)).limit(1);
+
+  if (!complexRow) {
+    await client.end();
+    throw new Error("No complex found: run the web (padel-quento) migrations before seeding");
+  }
+
   const courts = await db
     .insert(schema.court)
-    .values(Array.from({ length: COURTS_COUNT }, (_, i) => ({ number: i + 1, state: CourtState.AVAILABLE, price: COURT_PRICE })))
+    .values(
+      Array.from({ length: COURTS_COUNT }, (_, i) => ({
+        number: i + 1,
+        state: CourtState.AVAILABLE,
+        price: COURT_PRICE,
+        complexId: complexRow.id,
+      })),
+    )
     .returning();
 
   await db.insert(schema.schedule).values(
