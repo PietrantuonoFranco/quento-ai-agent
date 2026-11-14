@@ -23,16 +23,18 @@ Flujo de un mensaje (según el diagrama):
 
 ### Modelo de datos
 
-![DER](docs/der/DER.jpg)
+![DER](docs/der/der.jpg)
 
-Entidades principales:
+El esquema lo crea y migra la web ([padel-quento](https://github.com/JoacoMazza/padel-quento)); el DER es una copia del de su rama `main` (`docs/der/der.mmd` + `der.jpg`). El bot solo espeja con Drizzle las tablas que usa.
+
+Entidades principales que usa el bot:
 
 - **bookers**: quien reserva, identificado por teléfono. Los jugadores registrados (Player) viven en la misma tabla con `type = 'Player'` y sus datos propios (`account_id`, `category`, `scoring`).
 - **courts**, **schedules**, **out_of_services**: canchas (con su precio), horarios de apertura/cierre por día y períodos fuera de servicio.
-- **bookings**: reservas de cancha asociadas a un `booker` (por teléfono), un horario y el precio de la cancha al reservar.
+- **bookings**: reservas de cancha asociadas a un `booker` (`booker_id`), un horario y el precio de la cancha al reservar. Los turnos de una clase tienen `lesson_id`.
 - **matches / match_players**: partidos abiertos a partir de una reserva y los jugadores anotados.
 
-> **El esquema es de la web.** La base la crea y migra la web de Quento (`padel-quento`, Next.js + TypeORM). En el bot, `mcp-server/src/db/schemas/*.ts` es un espejo en Drizzle (Cloudflare Workers no se lleva bien con TypeORM) de **solo las tablas que usa el bot**; el resto (cuentas, admins, chats, penalizaciones, turnos fijos, reseñas) existe en la base pero no se declara acá. Los estados son enums de Postgres cuyos valores replican `mcp-server/src/lib/enums/`. Si la web cambia una de estas tablas, hay que actualizar el schema correspondiente a mano.
+> **El esquema es de la web.** La base la crea y migra la web de Quento (`padel-quento`, Next.js + TypeORM). En el bot, `mcp-server/src/db/schemas/*.ts` es un espejo en Drizzle (Cloudflare Workers no se lleva bien con TypeORM) de **solo las tablas que usa el bot**; el resto (cuentas, admins, chats, penalizaciones, turnos fijos, reseñas, clases e inscripciones) existe en la base pero no se declara acá. Los estados son enums de Postgres cuyos valores replican `mcp-server/src/lib/enums/`. Si la web cambia una de estas tablas, hay que actualizar el schema correspondiente a mano.
 
 ### Convención de fechas
 
@@ -63,7 +65,7 @@ Los horarios de reservas y partidos se guardan como **hora de pared del club** e
 ├── docker-compose.yaml       # Postgres local para desarrollo
 ├── docs/
 │   ├── mcp-arquitecture/     # Diagrama de arquitectura (.drawio / .jpg)
-│   └── der/                  # Diagrama entidad-relación (.drawio / .jpg)
+│   └── der/                  # Diagrama entidad-relación (.mmd / .jpg, copia del de padel-quento)
 ├── mcp-host/                  # Cliente/host MCP (FastAPI, Python + uv), desplegado en Railway
 └── mcp-server/                 # Servidor MCP (Cloudflare Worker) + acceso a datos
     ├── src/
