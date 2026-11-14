@@ -13,6 +13,8 @@ import { getCourtById, getAllCourts, checkCourtAvailability } from "../db/querie
 import { getScheduleByCourtIdAndDay, getSchedulesByDay } from "../db/queries/scheduleQueries";
 import { recordPenalty } from "../db/queries/penaltyQueries";
 import { getBookedFixedBookingDateByBookingId, releaseFixedBookingDate } from "../db/queries/fixedBookingQueries";
+import { getMatchPlayersContacts } from "../db/queries/matchPlayerQueries";
+import { getLessonStudentsContacts } from "../db/queries/lessonQueries";
 import {
   getAvailableBookingsInputSchema,
   getAvailableTimesInputSchema,
@@ -28,6 +30,9 @@ import CourtState from "../lib/enums/courtState";
 import DayOfWeek from "../lib/enums/dayOfWeek";
 import BookerType from "../lib/enums/bookerType";
 import { LATE_CANCELLATION_REASON, PENALTY_POINTS, isLateCancellation } from "../lib/penalties";
+import { classCancelledByTeacherNotice, matchCancelledByCreatorNotice } from "../lib/notices";
+import { notify } from "../lib/whatsapp";
+import { notifySafely } from "../lib/notifySafely";
 import { BOOKING_DURATION_MINUTES } from "../lib/constants";
 import { todayInClubTimezone, nowInClubTime } from "../lib/clubTime";
 import type Env from "../lib/interfaces/EnvInterface";
@@ -158,14 +163,48 @@ async function getOwnedBooking(env: Env, bookingId: number, phoneNumber: string)
   return { bookingRow, bookerRow };
 }
 
+type OwnedBooking = { id: number; datetime: Date; lessonId: number | null; courtId: number | null };
+type Owner = { id: number; type: string; names: string; lastNames: string };
+
+// Avisa por WhatsApp a quienes pierden el turno cancelado, como la web: a los demás jugadores si
+// era un partido abierto y a los alumnos si era una fecha de una clase. Nunca hace fallar la cancelación.
+async function notifyCancellation(env: Env, bookingRow: OwnedBooking, bookerRow: Owner) {
+  await notifySafely("cancel_booking", async () => {
+    const [matchRow, courtRow] = await Promise.all([
+      getMatchByBookingId(env, bookingRow.id),
+      bookingRow.courtId !== null ? getCourtById(env, bookingRow.courtId) : null,
+    ]);
+
+    if (!courtRow) return;
+
+    const notice = { datetime: bookingRow.datetime, courtNumber: courtRow.number };
+    const ownerName = `${bookerRow.names} ${bookerRow.lastNames}`;
+
+    if (matchRow) {
+      const players = await getMatchPlayersContacts(env, matchRow.id);
+      const others = players
+        .filter((player) => player.playerId !== bookerRow.id)
+        .map(({ names, phoneNumber }) => ({ names, phoneNumber }));
+
+      if (others.length > 0) {
+        await notify(env, others, (recipient) => matchCancelledByCreatorNotice(recipient.names, ownerName, notice));
+      }
+    }
+
+    if (bookingRow.lessonId !== null) {
+      const students = await getLessonStudentsContacts(env, bookingRow.lessonId);
+
+      if (students.length > 0) {
+        await notify(env, students, (recipient) => classCancelledByTeacherNotice(recipient.names, ownerName, notice));
+      }
+    }
+  });
+}
+
 // Cancela un turno con las reglas de la web: una fecha de turno fijo se libera (sin dar de baja
 // el turno fijo) y nunca penaliza; un turno de clase tampoco. En el resto, cancelar con menos de
 // LATE_CANCELLATION_HOURS penaliza a quien reservó, solo si tiene cuenta (es un Player).
-async function cancelOwnedBooking(
-  env: Env,
-  bookingRow: { id: number; datetime: Date; lessonId: number | null },
-  bookerRow: { id: number; type: string },
-) {
+async function cancelOwnedBooking(env: Env, bookingRow: OwnedBooking, bookerRow: Owner) {
   const fixedDate = await getBookedFixedBookingDateByBookingId(env, bookingRow.id);
 
   if (fixedDate) {
@@ -175,6 +214,7 @@ async function cancelOwnedBooking(
   }
 
   await cancelBooking(env, bookingRow.id);
+  await notifyCancellation(env, bookingRow, bookerRow);
 
   const penalized =
     bookingRow.lessonId === null &&
@@ -344,7 +384,7 @@ export function getBookingTools(env: Env): Tool[] {
     {
       name: "cancel_booking",
       description:
-        "Cancels an upcoming booking; only its owner (matching phone number) can cancel it. Cancelling less than 3 hours before the start deducts 20 loyalty points from players with an account (pointsDeducted), except for class sessions and fixed booking dates. For a date of a fixed booking it cancels only that date; use cancel_fixed_booking to cancel the whole fixed booking",
+        "Cancels an upcoming booking; only its owner (matching phone number) can cancel it. If it was an open match, the other players are notified by WhatsApp; if it was a class session, its students are. Cancelling less than 3 hours before the start deducts 20 loyalty points from players with an account (pointsDeducted), except for class sessions and fixed booking dates. For a date of a fixed booking it cancels only that date; use cancel_fixed_booking to cancel the whole fixed booking",
       inputSchema: cancelBookingInputSchema,
       execute: async (input) => {
         const { bookingRow, bookerRow } = await getOwnedBooking(env, input.bookingId, input.phoneNumber);

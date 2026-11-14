@@ -8,6 +8,9 @@ vi.mock("../src/db/queries/courtQueries");
 vi.mock("../src/db/queries/scheduleQueries");
 vi.mock("../src/db/queries/penaltyQueries");
 vi.mock("../src/db/queries/fixedBookingQueries");
+vi.mock("../src/db/queries/matchPlayerQueries");
+vi.mock("../src/db/queries/lessonQueries");
+vi.mock("../src/lib/whatsapp");
 
 import * as bookingQueries from "../src/db/queries/bookingQueries";
 import * as outOfServiceQueries from "../src/db/queries/outOfServiceQueries";
@@ -18,6 +21,10 @@ import * as scheduleQueries from "../src/db/queries/scheduleQueries";
 import * as penaltyQueries from "../src/db/queries/penaltyQueries";
 import * as fixedBookingQueries from "../src/db/queries/fixedBookingQueries";
 import { LATE_CANCELLATION_REASON } from "../src/lib/penalties";
+import * as matchPlayerQueries from "../src/db/queries/matchPlayerQueries";
+import * as lessonQueries from "../src/db/queries/lessonQueries";
+import * as whatsapp from "../src/lib/whatsapp";
+import { classCancelledByTeacherNotice, matchCancelledByCreatorNotice } from "../src/lib/notices";
 import { getBookingTools } from "../src/tools/bookingTools";
 import { NOW_UTC, TODAY, TOMORROW, at, bookingRow, callTool, env, schedule } from "./helpers";
 
@@ -44,9 +51,17 @@ beforeEach(() => {
   q(outOfServiceQueries.getOutOfServicesInRange).mockResolvedValue([]);
   q(courtQueries.checkCourtAvailability).mockResolvedValue(0);
   q(matchQueries.getMatchByBookingId).mockResolvedValue(null as any);
-  q(bookerQueries.getBookerByPhoneNumber).mockResolvedValue({ id: 5, phoneNumber: "5491111", type: "Player" } as any);
+  q(bookerQueries.getBookerByPhoneNumber).mockResolvedValue({
+    id: 5,
+    phoneNumber: "5491111",
+    type: "Player",
+    names: "Fran",
+    lastNames: "Pérez",
+  } as any);
   q(fixedBookingQueries.getBookedFixedBookingDateByBookingId).mockResolvedValue(null as any);
   q(penaltyQueries.recordPenalty).mockResolvedValue(-20);
+  q(matchPlayerQueries.getMatchPlayersContacts).mockResolvedValue([]);
+  q(lessonQueries.getLessonStudentsContacts).mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -591,6 +606,68 @@ describe("cancel_booking", () => {
       await call("cancel_booking", { bookingId: 1, phoneNumber: "5491111" });
 
       expect(penaltyQueries.recordPenalty).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("avisos", () => {
+    const notice = { datetime: at(TOMORROW, "12:00"), courtNumber: 1 };
+
+    beforeEach(() => {
+      q(bookingQueries.getBookingById).mockResolvedValue(bookingRow() as any);
+      q(bookingQueries.cancelBooking).mockResolvedValue({ bookingState: "cancelled" } as any);
+    });
+
+    it("si el turno era un partido, avisa a los demás jugadores", async () => {
+      q(matchQueries.getMatchByBookingId).mockResolvedValue({ id: 9, needPlayers: true } as any);
+      q(matchPlayerQueries.getMatchPlayersContacts).mockResolvedValue([
+        { playerId: 5, names: "Fran", lastNames: "Pérez", phoneNumber: "5491111", playersCount: 1 },
+        { playerId: 6, names: "Ana", lastNames: "Gómez", phoneNumber: "5493333", playersCount: 1 },
+      ] as any);
+
+      await call("cancel_booking", { bookingId: 1, phoneNumber: "5491111" });
+
+      expect(matchPlayerQueries.getMatchPlayersContacts).toHaveBeenCalledWith(env, 9);
+      const [notifyEnv, recipients, build] = q(whatsapp.notify).mock.calls[0];
+      expect(notifyEnv).toBe(env);
+      expect(recipients).toEqual([{ names: "Ana", phoneNumber: "5493333" }]);
+      expect(build(recipients[0])).toEqual(matchCancelledByCreatorNotice("Ana", "Fran Pérez", notice));
+    });
+
+    it("si era un turno de clase, avisa a los alumnos", async () => {
+      q(bookingQueries.getBookingById).mockResolvedValue(bookingRow({ lessonId: 3 }) as any);
+      q(lessonQueries.getLessonStudentsContacts).mockResolvedValue([{ names: "Leo", phoneNumber: "5494444" }] as any);
+
+      await call("cancel_booking", { bookingId: 1, phoneNumber: "5491111" });
+
+      expect(lessonQueries.getLessonStudentsContacts).toHaveBeenCalledWith(env, 3);
+      const [, recipients, build] = q(whatsapp.notify).mock.calls[0];
+      expect(recipients).toEqual([{ names: "Leo", phoneNumber: "5494444" }]);
+      expect(build(recipients[0])).toEqual(classCancelledByTeacherNotice("Leo", "Fran Pérez", notice));
+    });
+
+    it("no avisa a nadie si era un turno común", async () => {
+      await call("cancel_booking", { bookingId: 1, phoneNumber: "5491111" });
+
+      expect(whatsapp.notify).not.toHaveBeenCalled();
+    });
+
+    it("no avisa a nadie al cancelar una fecha de su turno fijo", async () => {
+      q(fixedBookingQueries.getBookedFixedBookingDateByBookingId).mockResolvedValue({ id: 30, fixedBookingId: 4 } as any);
+      q(matchQueries.getMatchByBookingId).mockResolvedValue({ id: 9 } as any);
+
+      await call("cancel_booking", { bookingId: 1, phoneNumber: "5491111" });
+
+      expect(whatsapp.notify).not.toHaveBeenCalled();
+    });
+
+    it("si el aviso falla, igual informa la cancelación", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      q(matchQueries.getMatchByBookingId).mockResolvedValue({ id: 9 } as any);
+      q(matchPlayerQueries.getMatchPlayersContacts).mockRejectedValue(new Error("db down"));
+
+      expect(await call("cancel_booking", { bookingId: 1, phoneNumber: "5491111" })).toMatchObject({
+        bookingState: "cancelled",
+      });
     });
   });
 

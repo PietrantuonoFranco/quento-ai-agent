@@ -156,3 +156,4 @@ describe("schema de inscriptions", () => {
     expect(columnsOf(inscription)).toEqual(["id", "lesson_id", "player_id", "created_at"].sort());
   });
 });
+

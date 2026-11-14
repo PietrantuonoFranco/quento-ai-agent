@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import CourtState from "../lib/enums/courtState";
-import PlayerCategory from "../lib/enums/playerCategory";
 
 /**
  * Consultar turnos disponibles para una fecha (y opcionalmente una cancha específica).
@@ -98,14 +97,6 @@ export const rescheduleBookingInputSchema = z.object({
 export const getClubInfoInputSchema = z.object({});
 
 /**
- * Convertir una reserva en un partido abierto que busca jugadores.
- */
-export const createMatchFromBookingInputSchema = z.object({
-  bookingId: bookingIdSchema,
-  phoneNumber: ownerPhoneSchema,
-});
-
-/**
  * Saber si un booker ya está registrado, a partir de su número de teléfono.
  */
 export const isBookerRegisteredInputSchema = z.object({
@@ -168,38 +159,6 @@ export const getCourtLocationInputSchema = z.object({
     .string()
     .optional()
     .describe("Name or number of the court (e.g. 'Cancha 2', '2')"),
-});
-
-/**
- * Consultar partidos abiertos (que aún necesitan jugadores).
- */
-export const getOpenMatchesInputSchema = z.object({
-  date: z
-    .string()
-    .optional()
-    .describe("Filter open matches by the date of their booking (YYYY-MM-DD)"),
-  courtId: z.number().int().positive().optional().describe("Filter open matches by court ID"),
-  category: z
-    .nativeEnum(PlayerCategory)
-    .optional()
-    .describe("Filter open matches by the players' category"),
-});
-
-/**
- * Unirse a un partido abierto. El jugador es el dueño del teléfono (lo inyecta el host),
- * nunca un id elegido por el modelo.
- */
-export const joinMatchInputSchema = z.object({
-  matchId: z.number().int().positive().describe("The match ID to join"),
-  phoneNumber: z.string().describe("Phone number of the player joining the match"),
-});
-
-/**
- * Salir de un partido del cual se es miembro (identificado por su teléfono).
- */
-export const leaveMatchInputSchema = z.object({
-  matchId: z.number().int().positive().describe("The match ID to leave"),
-  phoneNumber: z.string().describe("Phone number of the player leaving the match"),
 });
 
 /**

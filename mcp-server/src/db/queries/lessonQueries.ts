@@ -90,3 +90,15 @@ export async function unenrollFromLesson(env: Env, lessonId: number, playerId: n
 
   return deleted.length > 0;
 }
+
+// Alumnos de una clase con lo necesario para avisarles (nombre y teléfono).
+export async function getLessonStudentsContacts(env: Env, lessonId: number) {
+  const db = getDb(env);
+
+  return db
+    .select({ names: booker.names, phoneNumber: booker.phoneNumber })
+    .from(inscription)
+    .innerJoin(booker, eq(inscription.playerId, booker.id))
+    .where(eq(inscription.lessonId, lessonId))
+    .orderBy(asc(inscription.id));
+}

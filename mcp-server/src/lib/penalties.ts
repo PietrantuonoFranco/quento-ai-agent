@@ -9,7 +9,6 @@ export const LATE_CANCELLATION_HOURS = 3;
 export const PENALTY_POINTS = 20;
 
 export const LATE_CANCELLATION_REASON = "Cancelación con menos de 3 horas de anticipación";
-export const LATE_LEAVE_REASON = "Baja de un partido con menos de 3 horas de anticipación";
 
 // Tardía si faltan menos de LATE_CANCELLATION_HOURS para el turno, o si ya empezó.
 // Ambas fechas en hora de pared del club (ver nowInClubTime).
