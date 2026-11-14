@@ -139,12 +139,15 @@ function parseClubDatetime(value: string): Date {
   return datetime;
 }
 
-// Devuelve la reserva si existe y pertenece a ese teléfono; si no, falla con el mismo mensaje
-// para no revelar reservas de otras personas.
+// Devuelve la reserva si existe y pertenece al booker de ese teléfono; si no, falla con el mismo
+// mensaje para no revelar reservas de otras personas.
 async function getOwnedBooking(env: Env, bookingId: number, phoneNumber: string) {
-  const bookingRow = await getBookingById(env, bookingId);
+  const [bookingRow, bookerRow] = await Promise.all([
+    getBookingById(env, bookingId),
+    getBookerByPhoneNumber(env, phoneNumber),
+  ]);
 
-  if (!bookingRow || bookingRow.bookerPhoneNumber !== phoneNumber) {
+  if (!bookingRow || !bookerRow || bookingRow.bookerId !== bookerRow.id) {
     throw new Error("Booking not found for this phone number");
   }
 
@@ -252,7 +255,7 @@ export function getBookingTools(env: Env): Tool[] {
 
         return createBooking(env, {
           courtId: input.courtId,
-          bookerPhoneNumber: input.bookerPhoneNumber,
+          bookerId: booker.id,
           datetime,
           durationMinutes: BOOKING_DURATION_MINUTES,
           bookingState: BookingState.RESERVED,

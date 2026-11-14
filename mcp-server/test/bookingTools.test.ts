@@ -39,6 +39,7 @@ beforeEach(() => {
   q(outOfServiceQueries.getOutOfServicesInRange).mockResolvedValue([]);
   q(courtQueries.checkCourtAvailability).mockResolvedValue(0);
   q(matchQueries.getMatchByBookingId).mockResolvedValue(null as any);
+  q(bookerQueries.getBookerByPhoneNumber).mockResolvedValue({ id: 5, phoneNumber: "5491111" } as any);
 });
 
 afterEach(() => {
@@ -336,7 +337,7 @@ describe("create_booking", () => {
 
     expect(bookingQueries.createBooking).toHaveBeenCalledWith(env, {
       courtId: 1,
-      bookerPhoneNumber: "5491111",
+      bookerId: 5,
       datetime: at(TOMORROW, "12:00"),
       durationMinutes: 90,
       bookingState: "reserved",
@@ -460,11 +461,20 @@ describe("get_booking_details", () => {
     q(bookingQueries.getBookingById).mockResolvedValueOnce(null as any);
     const missing = await call("get_booking_details", { bookingId: 1, phoneNumber: "5491111" }).catch((e) => e.message);
 
-    q(bookingQueries.getBookingById).mockResolvedValueOnce(bookingRow({ bookerPhoneNumber: "otro" }) as any);
+    q(bookingQueries.getBookingById).mockResolvedValueOnce(bookingRow({ bookerId: 99 }) as any);
     const foreign = await call("get_booking_details", { bookingId: 1, phoneNumber: "5491111" }).catch((e) => e.message);
 
     expect(missing).toBe("Booking not found for this phone number");
     expect(foreign).toBe(missing);
+  });
+
+  it("usa el mismo error si el teléfono no tiene un booker registrado", async () => {
+    q(bookingQueries.getBookingById).mockResolvedValue(bookingRow() as any);
+    q(bookerQueries.getBookerByPhoneNumber).mockResolvedValue(null as any);
+
+    await expect(call("get_booking_details", { bookingId: 1, phoneNumber: "5491111" })).rejects.toThrow(
+      "Booking not found for this phone number",
+    );
   });
 });
 
@@ -480,7 +490,7 @@ describe("cancel_booking", () => {
   });
 
   it("no deja cancelar la reserva de otra persona", async () => {
-    q(bookingQueries.getBookingById).mockResolvedValue(bookingRow({ bookerPhoneNumber: "otro" }) as any);
+    q(bookingQueries.getBookingById).mockResolvedValue(bookingRow({ bookerId: 99 }) as any);
 
     await expect(call("cancel_booking", { bookingId: 1, phoneNumber: "5491111" })).rejects.toThrow("not found");
     expect(bookingQueries.cancelBooking).not.toHaveBeenCalled();
@@ -568,7 +578,7 @@ describe("reschedule_booking", () => {
   });
 
   it("solo su dueño puede mover la reserva", async () => {
-    q(bookingQueries.getBookingById).mockResolvedValue(bookingRow({ bookerPhoneNumber: "otro" }) as any);
+    q(bookingQueries.getBookingById).mockResolvedValue(bookingRow({ bookerId: 99 }) as any);
 
     await expect(call("reschedule_booking", input)).rejects.toThrow("not found");
     expect(bookingQueries.rescheduleBooking).not.toHaveBeenCalled();

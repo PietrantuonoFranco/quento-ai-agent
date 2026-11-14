@@ -23,7 +23,7 @@ describe("get_club_info", () => {
     q(courtQueries.getAllCourts).mockResolvedValue([
       { id: 1, state: "available" },
       { id: 2, state: "available" },
-      { id: 3, state: "maintenance" },
+      { id: 3, state: "closed_down" },
     ] as any);
     q(scheduleQueries.getAllSchedules).mockResolvedValue([
       { courtId: 1, dayOfWeek: "monday", openingTime: "09:00:00", closingTime: "23:00:00" },
@@ -33,7 +33,7 @@ describe("get_club_info", () => {
     const result = await call();
 
     expect(result.totalCourts).toBe(3);
-    expect(result.courtsByState).toEqual({ available: 2, maintenance: 1 });
+    expect(result.courtsByState).toEqual({ available: 2, closed_down: 1 });
     expect(result.slotDurationMinutes).toBe(90);
     expect(result.timezone).toBe("America/Argentina/Buenos_Aires");
     expect(result.openingHours).toHaveLength(7);
@@ -94,13 +94,13 @@ describe("court tools", () => {
   it("list_courts filtra por estado", async () => {
     q(courtQueries.getAllCourts).mockResolvedValue([]);
 
-    await callTool(tools, "list_courts", { state: "maintenance" });
+    await callTool(tools, "list_courts", { state: "closed_down" });
 
-    expect(courtQueries.getAllCourts).toHaveBeenCalledWith(env, "maintenance");
+    expect(courtQueries.getAllCourts).toHaveBeenCalledWith(env, "closed_down");
   });
 
   it("list_courts rechaza un estado inválido", async () => {
-    await expect(callTool(tools, "list_courts", { state: "roto" })).rejects.toThrow();
+    await expect(callTool(tools, "list_courts", { state: "maintenance" })).rejects.toThrow();
   });
 
   const mockComplex = {

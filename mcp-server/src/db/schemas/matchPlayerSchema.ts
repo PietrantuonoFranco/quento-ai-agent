@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, boolean, timestamp, unique } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, timestamp, unique } from "drizzle-orm/pg-core";
 
 import { match } from "./matchSchema";
 import { booker } from "./bookerSchema";
@@ -10,8 +10,11 @@ export const matchPlayer = pgTable("match_players", {
 
   matchId: integer("match_id").references(() => match.id, { onDelete: "cascade" }),
   playerId: integer("player_id").references(() => booker.id, { onDelete: "cascade" }),
+  // El jugador que se anota más los acompañantes sin cuenta que trae.
   playersCount: integer("players_count").default(1).notNull(),
-  attended: boolean("attended").default(true).notNull(),
+  // Cuántos de ese grupo asistieron (lo ajusta el admin desde la web) y los puntos que acreditó el job.
+  attendedCount: integer("attended_count").default(1).notNull(),
+  pointsAwarded: integer("points_awarded").default(0).notNull(),
 
   joinedAt: timestamp("joined_at", { mode: 'date' }).defaultNow().notNull(),
 }, (table) => [

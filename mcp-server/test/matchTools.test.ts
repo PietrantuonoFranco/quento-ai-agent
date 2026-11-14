@@ -95,13 +95,11 @@ describe("create_match_from_booking", () => {
     expect(result.ownerJoined).toBe(true);
   });
 
-  it("no agrega jugadores si el booker no existe", async () => {
+  it("falla si el teléfono no tiene un booker registrado", async () => {
     q(bookerQueries.getBookerByPhoneNumber).mockResolvedValue(null as any);
 
-    const result = await call("create_match_from_booking", input);
-
-    expect(matchPlayerQueries.createMatchPlayer).not.toHaveBeenCalled();
-    expect(result.ownerJoined).toBe(false);
+    await expect(call("create_match_from_booking", input)).rejects.toThrow("Booking not found");
+    expect(matchQueries.createMatch).not.toHaveBeenCalled();
   });
 
   it("falla si la reserva no existe", async () => {
@@ -112,7 +110,7 @@ describe("create_match_from_booking", () => {
   });
 
   it("falla si la reserva es de otra persona", async () => {
-    q(bookingQueries.getBookingById).mockResolvedValue(bookingRow({ bookerPhoneNumber: "otro" }) as any);
+    q(bookingQueries.getBookingById).mockResolvedValue(bookingRow({ bookerId: 99 }) as any);
 
     await expect(call("create_match_from_booking", input)).rejects.toThrow("Booking not found");
     expect(matchQueries.createMatch).not.toHaveBeenCalled();

@@ -1,6 +1,6 @@
 import { getDb } from "../database";
-import { booking } from "../schemas";
-import { and, asc, eq, gte, ne, sql } from "drizzle-orm";
+import { booker, booking } from "../schemas";
+import { and, asc, eq, getTableColumns, gte, ne, sql } from "drizzle-orm";
 import type Env from "../../lib/interfaces/EnvInterface";
 import BookingState from "../../lib/enums/bookingState";
 
@@ -64,15 +64,17 @@ export async function checkBookingAvailability(
 }
 
 // Reservas no canceladas de un teléfono desde `from` (hora de pared del club) en adelante, ordenadas por fecha.
+// Los turnos referencian al booker por id, así que se resuelve el teléfono con un join.
 export async function getUpcomingBookingsByPhone(env: Env, phoneNumber: string, from: Date) {
   const db = getDb(env);
 
   return db
-    .select()
+    .select(getTableColumns(booking))
     .from(booking)
+    .innerJoin(booker, eq(booking.bookerId, booker.id))
     .where(
       and(
-        eq(booking.bookerPhoneNumber, phoneNumber),
+        eq(booker.phoneNumber, phoneNumber),
         ne(booking.bookingState, BookingState.CANCELLED),
         gte(booking.datetime, sql`${from.toISOString()}::timestamp`),
       ),

@@ -73,28 +73,6 @@ export async function getAllCourts(env: Env, state?: CourtState) {
   return db.select().from(court);
 }
 
-export async function blockCourt(env: Env, id: number) {
-  const db = getDb(env);
-  const result = await db
-    .update(court)
-    .set({ state: CourtState.OUT_OF_SERVICE })
-    .where(eq(court.id, id))
-    .returning();
-
-  return result[0] || null;
-}
-
-export async function unblockCourt(env: Env, id: number) {
-  const db = getDb(env);
-  const result = await db
-    .update(court)
-    .set({ state: CourtState.AVAILABLE })
-    .where(eq(court.id, id))
-    .returning();
-
-  return result[0] || null;
-}
-
 // Cuenta conflictos (fuera de servicio + reservas solapadas) para el rango pedido; 0 = disponible.
 export async function checkCourtAvailability(
   env: Env,

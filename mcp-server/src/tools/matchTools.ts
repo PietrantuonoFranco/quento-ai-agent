@@ -41,9 +41,12 @@ export function getMatchTools(env: Env): Tool[] {
         "Turns an upcoming booking into an open match that looks for players; only the booking's owner can do it. If the booker has an associated player, they are added to the match",
       inputSchema: createMatchFromBookingInputSchema,
       execute: async (input) => {
-        const bookingRow = await getBookingById(env, input.bookingId);
+        const [bookingRow, bookerRow] = await Promise.all([
+          getBookingById(env, input.bookingId),
+          getBookerByPhoneNumber(env, input.phoneNumber),
+        ]);
 
-        if (!bookingRow || bookingRow.bookerPhoneNumber !== input.phoneNumber) {
+        if (!bookingRow || !bookerRow || bookingRow.bookerId !== bookerRow.id) {
           throw new Error("Booking not found for this phone number");
         }
 
@@ -54,8 +57,7 @@ export function getMatchTools(env: Env): Tool[] {
         const matchRow = await createMatch(env, { bookingId: bookingRow.id, needPlayers: true });
 
         // Un Player es un booker con type "Player", así que su id de jugador es el mismo id de booker.
-        const bookerRow = await getBookerByPhoneNumber(env, input.phoneNumber);
-        const ownerIsPlayer = bookerRow?.type === BookerType.PLAYER;
+        const ownerIsPlayer = bookerRow.type === BookerType.PLAYER;
 
         if (ownerIsPlayer) await createMatchPlayer(env, { matchId: matchRow.id, playerId: bookerRow.id });
 
