@@ -12,7 +12,6 @@ import {
   getMyBookingsInputSchema,
   listCourtsInputSchema,
   rescheduleBookingInputSchema,
-  createMatchFromBookingInputSchema,
 } from "../src/schemas/inputSchemas";
 
 describe("inputSchemas", () => {
@@ -56,7 +55,6 @@ describe("inputSchemas", () => {
   it.each([
     ["get_booking_details", getBookingDetailsInputSchema],
     ["cancel_booking", cancelBookingInputSchema],
-    ["create_match_from_booking", createMatchFromBookingInputSchema],
   ])("%s exige bookingId positivo y phoneNumber", (_name, schema) => {
     expect(schema.safeParse({ bookingId: 1, phoneNumber: "549" }).success).toBe(true);
     expect(schema.safeParse({ bookingId: 0, phoneNumber: "549" }).success).toBe(false);

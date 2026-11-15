@@ -8,3 +8,11 @@ export { matchPlayer } from "./matchPlayerSchema";
 export { match } from "./matchSchema";
 export { outOfService, outOfServiceReasonEnum } from "./outOfServiceSchema";
 export { schedule, dayOfWeekEnum } from "./scheduleSchema";
+export { penalty } from "./penaltySchema";
+export {
+  fixedBooking,
+  fixedBookingDate,
+  fixedBookingFrequencyEnum,
+  fixedBookingDateStateEnum,
+} from "./fixedBookingSchema";
+export { lesson, lessonSchedule, inscription, lessonScheduleDayOfWeekEnum } from "./lessonSchema";

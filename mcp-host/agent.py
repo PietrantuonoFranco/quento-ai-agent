@@ -9,7 +9,7 @@ from mcp import types as mcp_types
 from client import ToolError, mcp_client
 from config import conf
 from prompts import build_system_prompt
-from tools import inject_phone, to_function_declarations, visible_tools
+from tools import inject_phone, to_function_declarations
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class Agent:
         self._declarations: list[types.FunctionDeclaration] = []
 
     async def load_tools(self) -> None:
-        tools = visible_tools(await self._mcp.list_tools())
+        tools = await self._mcp.list_tools()
         self._tools = {t.name: t for t in tools}
         self._declarations = to_function_declarations(tools)
 

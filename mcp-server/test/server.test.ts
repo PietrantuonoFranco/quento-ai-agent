@@ -46,11 +46,13 @@ const EXPECTED_TOOLS = [
   "list_courts",
   "get_court_status",
   "get_court_location",
-  "get_open_matches",
-  "join_match",
-  "leave_match",
-  "create_match_from_booking",
   "get_club_info",
+  "get_my_fixed_bookings",
+  "cancel_fixed_booking",
+  "get_available_lessons",
+  "get_my_lessons",
+  "enroll_in_lesson",
+  "leave_lesson",
 ];
 
 describe("registro de tools", () => {

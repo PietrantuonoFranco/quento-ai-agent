@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import CourtState from "../lib/enums/courtState";
-import PlayerCategory from "../lib/enums/playerCategory";
 
 /**
  * Consultar turnos disponibles para una fecha (y opcionalmente una cancha específica).
@@ -98,14 +97,6 @@ export const rescheduleBookingInputSchema = z.object({
 export const getClubInfoInputSchema = z.object({});
 
 /**
- * Convertir una reserva en un partido abierto que busca jugadores.
- */
-export const createMatchFromBookingInputSchema = z.object({
-  bookingId: bookingIdSchema,
-  phoneNumber: ownerPhoneSchema,
-});
-
-/**
  * Saber si un booker ya está registrado, a partir de su número de teléfono.
  */
 export const isBookerRegisteredInputSchema = z.object({
@@ -171,32 +162,50 @@ export const getCourtLocationInputSchema = z.object({
 });
 
 /**
- * Consultar partidos abiertos (que aún necesitan jugadores).
+ * Listar los turnos fijos activos de un booker.
  */
-export const getOpenMatchesInputSchema = z.object({
-  date: z
-    .string()
-    .optional()
-    .describe("Filter open matches by the date of their booking (YYYY-MM-DD)"),
-  courtId: z.number().int().positive().optional().describe("Filter open matches by court ID"),
-  category: z
-    .nativeEnum(PlayerCategory)
-    .optional()
-    .describe("Filter open matches by the players' category"),
+export const getMyFixedBookingsInputSchema = z.object({
+  phoneNumber: z.string().describe("The booker's phone number"),
 });
 
 /**
- * Unirse a un partido abierto.
+ * Dar de baja un turno fijo completo (solo su titular). Para cancelar una sola
+ * fecha se usa cancel_booking con el turno de esa fecha.
  */
-export const joinMatchInputSchema = z.object({
-  matchId: z.number().int().positive().describe("The match ID to join"),
-  playerId: z.number().int().positive().describe("The player ID joining the match"),
+export const cancelFixedBookingInputSchema = z.object({
+  fixedBookingId: z.number().int().positive().describe("The fixed booking ID (from get_my_fixed_bookings)"),
+  phoneNumber: z.string().describe("Phone number of the fixed booking's holder (must match)"),
 });
 
 /**
- * Salir de un partido del cual se es miembro.
+ * Listar las clases abiertas (activas y no terminadas). El teléfono marca en cuáles está
+ * inscripto el cliente y cuáles da como profesor.
  */
-export const leaveMatchInputSchema = z.object({
-  matchId: z.number().int().positive().describe("The match ID to leave"),
-  playerId: z.number().int().positive().describe("The player ID leaving the match"),
+export const getAvailableLessonsInputSchema = z.object({
+  phoneNumber: z.string().describe("The customer's phone number"),
+});
+
+/**
+ * Listar las clases en las que está inscripto el cliente.
+ */
+export const getMyLessonsInputSchema = z.object({
+  phoneNumber: z.string().describe("The customer's phone number"),
+});
+
+const lessonIdSchema = z.number().int().positive().describe("The class ID (from get_available_lessons)");
+
+/**
+ * Inscribirse en una clase (solo jugadores con cuenta).
+ */
+export const enrollInLessonInputSchema = z.object({
+  lessonId: lessonIdSchema,
+  phoneNumber: z.string().describe("Phone number of the player enrolling"),
+});
+
+/**
+ * Darse de baja de una clase.
+ */
+export const leaveLessonInputSchema = z.object({
+  lessonId: lessonIdSchema,
+  phoneNumber: z.string().describe("Phone number of the enrolled player"),
 });

@@ -6,6 +6,11 @@ vi.mock("../src/db/queries/matchQueries");
 vi.mock("../src/db/queries/bookerQueries");
 vi.mock("../src/db/queries/courtQueries");
 vi.mock("../src/db/queries/scheduleQueries");
+vi.mock("../src/db/queries/penaltyQueries");
+vi.mock("../src/db/queries/fixedBookingQueries");
+vi.mock("../src/db/queries/matchPlayerQueries");
+vi.mock("../src/db/queries/lessonQueries");
+vi.mock("../src/lib/whatsapp");
 
 import * as bookingQueries from "../src/db/queries/bookingQueries";
 import * as outOfServiceQueries from "../src/db/queries/outOfServiceQueries";
@@ -13,6 +18,13 @@ import * as matchQueries from "../src/db/queries/matchQueries";
 import * as bookerQueries from "../src/db/queries/bookerQueries";
 import * as courtQueries from "../src/db/queries/courtQueries";
 import * as scheduleQueries from "../src/db/queries/scheduleQueries";
+import * as penaltyQueries from "../src/db/queries/penaltyQueries";
+import * as fixedBookingQueries from "../src/db/queries/fixedBookingQueries";
+import { LATE_CANCELLATION_REASON } from "../src/lib/penalties";
+import * as matchPlayerQueries from "../src/db/queries/matchPlayerQueries";
+import * as lessonQueries from "../src/db/queries/lessonQueries";
+import * as whatsapp from "../src/lib/whatsapp";
+import { classCancelledByTeacherNotice, matchCancelledByCreatorNotice } from "../src/lib/notices";
 import { getBookingTools } from "../src/tools/bookingTools";
 import { NOW_UTC, TODAY, TOMORROW, at, bookingRow, callTool, env, schedule } from "./helpers";
 
@@ -20,7 +32,7 @@ const tools = getBookingTools(env);
 const call = (name: string, args: Record<string, unknown> = {}) => callTool(tools, name, args);
 
 const court1 = { id: 1, number: 1, state: "available", price: "20000.00" };
-const court2 = { id: 2, number: 2, state: "available", price: "20000.00" };
+const court2 = { id: 2, number: 2, state: "available", price: "22000.00" };
 
 // Grilla de 90' con apertura 09:00 y cierre 23:00 (el último turno que entra arranca 21:00).
 const FULL_GRID = ["09:00", "10:30", "12:00", "13:30", "15:00", "16:30", "18:00", "19:30", "21:00"];
@@ -39,6 +51,17 @@ beforeEach(() => {
   q(outOfServiceQueries.getOutOfServicesInRange).mockResolvedValue([]);
   q(courtQueries.checkCourtAvailability).mockResolvedValue(0);
   q(matchQueries.getMatchByBookingId).mockResolvedValue(null as any);
+  q(bookerQueries.getBookerByPhoneNumber).mockResolvedValue({
+    id: 5,
+    phoneNumber: "5491111",
+    type: "Player",
+    names: "Fran",
+    lastNames: "Pérez",
+  } as any);
+  q(fixedBookingQueries.getBookedFixedBookingDateByBookingId).mockResolvedValue(null as any);
+  q(penaltyQueries.recordPenalty).mockResolvedValue(-20);
+  q(matchPlayerQueries.getMatchPlayersContacts).mockResolvedValue([]);
+  q(lessonQueries.getLessonStudentsContacts).mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -56,7 +79,8 @@ describe("get_available_bookings", () => {
     expect(result).toHaveLength(2);
     expect(slotsOf(result, 1)).toEqual(FULL_GRID);
     expect(slotsOf(result, 2)).toEqual(FULL_GRID);
-    expect(result[0]).toMatchObject({ courtId: 1, courtNumber: 1 });
+    expect(result[0]).toMatchObject({ courtId: 1, courtNumber: 1, price: 20000 });
+    expect(result[1]).toMatchObject({ courtId: 2, courtNumber: 2, price: 22000 });
     expect(result[0].slots[0]).toBe(`${TOMORROW}T09:00:00.000Z`);
   });
 
@@ -270,8 +294,8 @@ describe("check_time_availability", () => {
       time: "13:30",
       available: true,
       courts: [
-        { courtId: 1, courtNumber: 1 },
-        { courtId: 2, courtNumber: 2 },
+        { courtId: 1, courtNumber: 1, price: 20000 },
+        { courtId: 2, courtNumber: 2, price: 22000 },
       ],
     });
   });
@@ -284,7 +308,7 @@ describe("check_time_availability", () => {
     const result = await call("check_time_availability", { date: TOMORROW, time: "13:30" });
 
     expect(result.available).toBe(true);
-    expect(result.courts).toEqual([{ courtId: 2, courtNumber: 2 }]);
+    expect(result.courts).toEqual([{ courtId: 2, courtNumber: 2, price: 22000 }]);
   });
 
   it("si está ocupado devuelve available=false y los horarios alternativos", async () => {
@@ -336,7 +360,7 @@ describe("create_booking", () => {
 
     expect(bookingQueries.createBooking).toHaveBeenCalledWith(env, {
       courtId: 1,
-      bookerPhoneNumber: "5491111",
+      bookerId: 5,
       datetime: at(TOMORROW, "12:00"),
       durationMinutes: 90,
       bookingState: "reserved",
@@ -413,7 +437,9 @@ describe("create_booking", () => {
 describe("get_my_bookings", () => {
   it("lista las reservas futuras con el número de cancha", async () => {
     q(bookingQueries.getUpcomingBookingsByPhone).mockResolvedValue([
-      bookingRow({ id: 7, courtId: 2, datetime: at(TOMORROW, "15:00") }),
+      bookingRow({ id: 7, courtId: 2, datetime: at(TOMORROW, "15:00"), lessonId: null, fixedBookingId: null }),
+      bookingRow({ id: 8, courtId: 1, datetime: at(TOMORROW, "18:00"), lessonId: 3, fixedBookingId: null }),
+      bookingRow({ id: 9, courtId: 1, datetime: at(TOMORROW, "21:00"), lessonId: null, fixedBookingId: 4 }),
     ] as any);
 
     const result = await call("get_my_bookings", { phoneNumber: "5491111" });
@@ -427,6 +453,31 @@ describe("get_my_bookings", () => {
         datetime: `${TOMORROW}T15:00:00.000Z`,
         durationMinutes: 90,
         bookingState: "reserved",
+        price: 20000,
+        isLesson: false,
+        fixedBookingId: null,
+      },
+      {
+        bookingId: 8,
+        courtId: 1,
+        courtNumber: 1,
+        datetime: `${TOMORROW}T18:00:00.000Z`,
+        durationMinutes: 90,
+        bookingState: "reserved",
+        price: 20000,
+        isLesson: true,
+        fixedBookingId: null,
+      },
+      {
+        bookingId: 9,
+        courtId: 1,
+        courtNumber: 1,
+        datetime: `${TOMORROW}T21:00:00.000Z`,
+        durationMinutes: 90,
+        bookingState: "reserved",
+        price: 20000,
+        isLesson: false,
+        fixedBookingId: 4,
       },
     ]);
   });
@@ -444,7 +495,14 @@ describe("get_booking_details", () => {
 
     const result = await call("get_booking_details", { bookingId: 1, phoneNumber: "5491111" });
 
-    expect(result).toMatchObject({ bookingId: 1, courtId: 1, courtNumber: 1, bookingState: "reserved", match: null });
+    expect(result).toMatchObject({
+      bookingId: 1,
+      courtId: 1,
+      courtNumber: 1,
+      bookingState: "reserved",
+      price: 20000,
+      match: null,
+    });
   });
 
   it("incluye los datos del partido si existe", async () => {
@@ -460,11 +518,20 @@ describe("get_booking_details", () => {
     q(bookingQueries.getBookingById).mockResolvedValueOnce(null as any);
     const missing = await call("get_booking_details", { bookingId: 1, phoneNumber: "5491111" }).catch((e) => e.message);
 
-    q(bookingQueries.getBookingById).mockResolvedValueOnce(bookingRow({ bookerPhoneNumber: "otro" }) as any);
+    q(bookingQueries.getBookingById).mockResolvedValueOnce(bookingRow({ bookerId: 99 }) as any);
     const foreign = await call("get_booking_details", { bookingId: 1, phoneNumber: "5491111" }).catch((e) => e.message);
 
     expect(missing).toBe("Booking not found for this phone number");
     expect(foreign).toBe(missing);
+  });
+
+  it("usa el mismo error si el teléfono no tiene un booker registrado", async () => {
+    q(bookingQueries.getBookingById).mockResolvedValue(bookingRow() as any);
+    q(bookerQueries.getBookerByPhoneNumber).mockResolvedValue(null as any);
+
+    await expect(call("get_booking_details", { bookingId: 1, phoneNumber: "5491111" })).rejects.toThrow(
+      "Booking not found for this phone number",
+    );
   });
 });
 
@@ -476,11 +543,153 @@ describe("cancel_booking", () => {
     const result = await call("cancel_booking", { bookingId: 1, phoneNumber: "5491111" });
 
     expect(bookingQueries.cancelBooking).toHaveBeenCalledWith(env, 1);
-    expect(result).toEqual({ bookingId: 1, bookingState: "cancelled", datetime: `${TOMORROW}T12:00:00.000Z` });
+    expect(penaltyQueries.recordPenalty).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      bookingId: 1,
+      bookingState: "cancelled",
+      datetime: `${TOMORROW}T12:00:00.000Z`,
+      pointsDeducted: 0,
+    });
+  });
+
+  describe("cancelación con menos de 3 horas", () => {
+    // Ahora son las 09:00: un turno a las 11:00 se cancela tarde.
+    const lateBooking = (overrides: Record<string, unknown> = {}) =>
+      bookingRow({ datetime: at(TODAY, "11:00"), lessonId: null, ...overrides });
+
+    beforeEach(() => {
+      q(bookingQueries.cancelBooking).mockResolvedValue({ bookingState: "cancelled" } as any);
+    });
+
+    it("penaliza al jugador con cuenta", async () => {
+      q(bookingQueries.getBookingById).mockResolvedValue(lateBooking() as any);
+
+      const result = await call("cancel_booking", { bookingId: 1, phoneNumber: "5491111" });
+
+      expect(penaltyQueries.recordPenalty).toHaveBeenCalledWith(env, 5, 20, LATE_CANCELLATION_REASON);
+      expect(result.pointsDeducted).toBe(20);
+    });
+
+    it("informa solo los puntos que realmente se descontaron", async () => {
+      q(bookingQueries.getBookingById).mockResolvedValue(lateBooking() as any);
+      q(penaltyQueries.recordPenalty).mockResolvedValue(-5);
+
+      const result = await call("cancel_booking", { bookingId: 1, phoneNumber: "5491111" });
+
+      expect(result.pointsDeducted).toBe(5);
+    });
+
+    it("no penaliza a quien no tiene cuenta", async () => {
+      q(bookingQueries.getBookingById).mockResolvedValue(lateBooking() as any);
+      q(bookerQueries.getBookerByPhoneNumber).mockResolvedValue({ id: 5, type: "Booker" } as any);
+
+      const result = await call("cancel_booking", { bookingId: 1, phoneNumber: "5491111" });
+
+      expect(bookingQueries.cancelBooking).toHaveBeenCalledWith(env, 1);
+      expect(penaltyQueries.recordPenalty).not.toHaveBeenCalled();
+      expect(result.pointsDeducted).toBe(0);
+    });
+
+    it("no penaliza al cancelar un turno de clase", async () => {
+      q(bookingQueries.getBookingById).mockResolvedValue(lateBooking({ lessonId: 3 }) as any);
+
+      await call("cancel_booking", { bookingId: 1, phoneNumber: "5491111" });
+
+      expect(bookingQueries.cancelBooking).toHaveBeenCalledWith(env, 1);
+      expect(penaltyQueries.recordPenalty).not.toHaveBeenCalled();
+    });
+
+    it("no penaliza al cancelar una fecha de un turno fijo", async () => {
+      q(bookingQueries.getBookingById).mockResolvedValue(lateBooking() as any);
+      q(fixedBookingQueries.getBookedFixedBookingDateByBookingId).mockResolvedValue({ id: 30, fixedBookingId: 4 } as any);
+
+      await call("cancel_booking", { bookingId: 1, phoneNumber: "5491111" });
+
+      expect(penaltyQueries.recordPenalty).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("avisos", () => {
+    const notice = { datetime: at(TOMORROW, "12:00"), courtNumber: 1 };
+
+    beforeEach(() => {
+      q(bookingQueries.getBookingById).mockResolvedValue(bookingRow() as any);
+      q(bookingQueries.cancelBooking).mockResolvedValue({ bookingState: "cancelled" } as any);
+    });
+
+    it("si el turno era un partido, avisa a los demás jugadores", async () => {
+      q(matchQueries.getMatchByBookingId).mockResolvedValue({ id: 9, needPlayers: true } as any);
+      q(matchPlayerQueries.getMatchPlayersContacts).mockResolvedValue([
+        { playerId: 5, names: "Fran", lastNames: "Pérez", phoneNumber: "5491111", playersCount: 1 },
+        { playerId: 6, names: "Ana", lastNames: "Gómez", phoneNumber: "5493333", playersCount: 1 },
+      ] as any);
+
+      await call("cancel_booking", { bookingId: 1, phoneNumber: "5491111" });
+
+      expect(matchPlayerQueries.getMatchPlayersContacts).toHaveBeenCalledWith(env, 9);
+      const [notifyEnv, recipients, build] = q(whatsapp.notify).mock.calls[0];
+      expect(notifyEnv).toBe(env);
+      expect(recipients).toEqual([{ names: "Ana", phoneNumber: "5493333" }]);
+      expect(build(recipients[0])).toEqual(matchCancelledByCreatorNotice("Ana", "Fran Pérez", notice));
+    });
+
+    it("si era un turno de clase, avisa a los alumnos", async () => {
+      q(bookingQueries.getBookingById).mockResolvedValue(bookingRow({ lessonId: 3 }) as any);
+      q(lessonQueries.getLessonStudentsContacts).mockResolvedValue([{ names: "Leo", phoneNumber: "5494444" }] as any);
+
+      await call("cancel_booking", { bookingId: 1, phoneNumber: "5491111" });
+
+      expect(lessonQueries.getLessonStudentsContacts).toHaveBeenCalledWith(env, 3);
+      const [, recipients, build] = q(whatsapp.notify).mock.calls[0];
+      expect(recipients).toEqual([{ names: "Leo", phoneNumber: "5494444" }]);
+      expect(build(recipients[0])).toEqual(classCancelledByTeacherNotice("Leo", "Fran Pérez", notice));
+    });
+
+    it("no avisa a nadie si era un turno común", async () => {
+      await call("cancel_booking", { bookingId: 1, phoneNumber: "5491111" });
+
+      expect(whatsapp.notify).not.toHaveBeenCalled();
+    });
+
+    it("no avisa a nadie al cancelar una fecha de su turno fijo", async () => {
+      q(fixedBookingQueries.getBookedFixedBookingDateByBookingId).mockResolvedValue({ id: 30, fixedBookingId: 4 } as any);
+      q(matchQueries.getMatchByBookingId).mockResolvedValue({ id: 9 } as any);
+
+      await call("cancel_booking", { bookingId: 1, phoneNumber: "5491111" });
+
+      expect(whatsapp.notify).not.toHaveBeenCalled();
+    });
+
+    it("si el aviso falla, igual informa la cancelación", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      q(matchQueries.getMatchByBookingId).mockResolvedValue({ id: 9 } as any);
+      q(matchPlayerQueries.getMatchPlayersContacts).mockRejectedValue(new Error("db down"));
+
+      expect(await call("cancel_booking", { bookingId: 1, phoneNumber: "5491111" })).toMatchObject({
+        bookingState: "cancelled",
+      });
+    });
+  });
+
+  it("cancela una fecha de un turno fijo liberándola, sin dar de baja el turno fijo", async () => {
+    q(bookingQueries.getBookingById).mockResolvedValue(bookingRow() as any);
+    q(fixedBookingQueries.getBookedFixedBookingDateByBookingId).mockResolvedValue({ id: 30, fixedBookingId: 4 } as any);
+
+    const result = await call("cancel_booking", { bookingId: 1, phoneNumber: "5491111" });
+
+    expect(fixedBookingQueries.releaseFixedBookingDate).toHaveBeenCalledWith(env, 30, 1);
+    expect(bookingQueries.cancelBooking).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      bookingId: 1,
+      bookingState: "cancelled",
+      datetime: `${TOMORROW}T12:00:00.000Z`,
+      pointsDeducted: 0,
+      fixedBookingId: 4,
+    });
   });
 
   it("no deja cancelar la reserva de otra persona", async () => {
-    q(bookingQueries.getBookingById).mockResolvedValue(bookingRow({ bookerPhoneNumber: "otro" }) as any);
+    q(bookingQueries.getBookingById).mockResolvedValue(bookingRow({ bookerId: 99 }) as any);
 
     await expect(call("cancel_booking", { bookingId: 1, phoneNumber: "5491111" })).rejects.toThrow("not found");
     expect(bookingQueries.cancelBooking).not.toHaveBeenCalled();
@@ -567,8 +776,15 @@ describe("reschedule_booking", () => {
     );
   });
 
+  it("no deja mover un turno de clase", async () => {
+    q(bookingQueries.getBookingById).mockResolvedValue(bookingRow({ lessonId: 3 }) as any);
+
+    await expect(call("reschedule_booking", input)).rejects.toThrow("belongs to a class");
+    expect(bookingQueries.rescheduleBooking).not.toHaveBeenCalled();
+  });
+
   it("solo su dueño puede mover la reserva", async () => {
-    q(bookingQueries.getBookingById).mockResolvedValue(bookingRow({ bookerPhoneNumber: "otro" }) as any);
+    q(bookingQueries.getBookingById).mockResolvedValue(bookingRow({ bookerId: 99 }) as any);
 
     await expect(call("reschedule_booking", input)).rejects.toThrow("not found");
     expect(bookingQueries.rescheduleBooking).not.toHaveBeenCalled();

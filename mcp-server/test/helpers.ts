@@ -28,10 +28,12 @@ export function bookingRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 1,
     courtId: 1,
-    bookerPhoneNumber: "5491111",
+    bookerId: 5,
+    lessonId: null,
     datetime: at(TOMORROW, "12:00"),
     durationMinutes: 90,
     bookingState: "reserved",
+    price: "20000.00",
     ...overrides,
   };
 }

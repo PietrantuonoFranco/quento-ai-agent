@@ -1,6 +1,6 @@
 from mcp import types as mcp_types
 
-from tools import HIDDEN_TOOLS, inject_phone, to_function_declarations, visible_tools
+from tools import inject_phone, to_function_declarations
 
 
 def tool(name, properties=None, required=None):
@@ -21,16 +21,6 @@ CREATE = tool(
     ["courtId", "bookerPhoneNumber", "datetime"],
 )
 CLUB = tool("get_club_info")
-
-
-MATCH_TOOLS = ["get_open_matches", "create_match_from_booking", "join_match", "leave_match"]
-
-
-def test_hides_every_open_match_tool():
-    tools = [CLUB, *(tool(name) for name in MATCH_TOOLS)]
-
-    assert [t.name for t in visible_tools(tools)] == ["get_club_info"]
-    assert set(MATCH_TOOLS) == HIDDEN_TOOLS
 
 
 def test_declarations_keep_name_and_description():
@@ -64,10 +54,6 @@ def test_declarations_strip_the_schema_keyword_and_do_not_mutate_the_tool():
     assert "$schema" not in decl.parameters_json_schema
     assert "phoneNumber" in CANCEL.input_schema["properties"]
     assert "$schema" in CANCEL.input_schema
-
-
-def test_declarations_skip_hidden_tools():
-    assert to_function_declarations([tool(name) for name in MATCH_TOOLS]) == []
 
 
 def test_inject_phone_sets_the_real_number():

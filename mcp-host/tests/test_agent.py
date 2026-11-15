@@ -33,11 +33,6 @@ TOOLS = [
             "properties": {"courtId": {"type": "integer"}, "name": {"type": "string"}},
         },
     ),
-    mcp_types.Tool(
-        name="get_open_matches",
-        description="matches",
-        input_schema={"type": "object", "properties": {}},
-    ),
 ]
 
 
@@ -100,7 +95,7 @@ async def test_sends_model_history_and_config_to_gemini(agent, llm):
     assert kwargs["config"].automatic_function_calling.disable is True
 
 
-async def test_only_visible_tools_are_declared_and_without_phone(agent, llm):
+async def test_tools_are_declared_without_phone(agent, llm):
     llm.generate.side_effect = [reply("ok")]
 
     await agent.respond([], "hola", PHONE)
@@ -170,7 +165,7 @@ async def test_unexpected_tool_failures_do_not_leak_details(agent, llm, mcp):
     assert "secret" not in str(function_responses(history)[0].response)
 
 
-async def test_unknown_and_hidden_tools_are_not_executed(agent, llm, mcp):
+async def test_unknown_tools_are_not_executed(agent, llm, mcp):
     llm.generate.side_effect = [
         tool_call(("get_open_matches", {}), ("drop_tables", {})),
         reply("No puedo"),

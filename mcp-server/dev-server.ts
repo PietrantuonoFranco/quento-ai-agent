@@ -17,6 +17,11 @@ if (!process.env.MCP_API_KEY) throw new Error("Missing MCP_API_KEY in .env");
 const env: Env = {
   DB: { connectionString: process.env.DATABASE_URL },
   MCP_API_KEY: process.env.MCP_API_KEY,
+  // Opcionales: sin token o sin phone number id las tools no mandan avisos por WhatsApp.
+  WHATSAPP_ACCESS_TOKEN: process.env.WHATSAPP_ACCESS_TOKEN,
+  WHATSAPP_PHONE_NUMBER_ID: process.env.WHATSAPP_PHONE_NUMBER_ID,
+  WHATSAPP_API_VERSION: process.env.WHATSAPP_API_VERSION,
+  WHATSAPP_TEMPLATE_LANGUAGE: process.env.WHATSAPP_TEMPLATE_LANGUAGE,
 };
 
 function streamToBuffer(stream: IncomingMessage): Promise<Buffer> {

@@ -10,16 +10,6 @@ from mcp import types as mcp_types
 # somebody else's bookings.
 PHONE_FIELDS = frozenset({"phoneNumber", "bookerPhoneNumber"})
 
-# Tools the server exposes but the agent doesn't use: it only handles bookings and questions
-# about the club, so open matches are out of its scope. (Also, join_match / leave_match take a
-# `playerId` that no tool maps from a phone number.)
-HIDDEN_TOOLS = frozenset({"get_open_matches", "create_match_from_booking", "join_match", "leave_match"})
-
-
-def visible_tools(tools: list[mcp_types.Tool]) -> list[mcp_types.Tool]:
-    return [t for t in tools if t.name not in HIDDEN_TOOLS]
-
-
 def _model_schema(schema: dict[str, Any]) -> dict[str, Any]:
     """The tool's JSON schema without the phone fields (which the host injects)."""
     schema = {k: v for k, v in schema.items() if k != "$schema"}
@@ -43,7 +33,7 @@ def to_function_declarations(tools: list[mcp_types.Tool]) -> list[types.Function
             description=tool.description or "",
             parameters_json_schema=_model_schema(tool.input_schema),
         )
-        for tool in visible_tools(tools)
+        for tool in tools
     ]
 
 

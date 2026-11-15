@@ -9,7 +9,7 @@ Quento es un asistente conversacional para la gestión de reservas de una cancha
 El sistema se divide en dos componentes principales:
 
 - **MCP Client / Host** (`mcp-host/`, Python + FastAPI): corre en Railway. Hoy es un esqueleto (solo expone un health check en `/`); su rol previsto es recibir los mensajes entrantes desde la WhatsApp API, mantener la conversación con el LLM y, cuando el LLM decide usar una herramienta, invocarla contra el MCP Server. También le pasa al LLM la lista de tools disponibles y los datos que las tools devuelven. Se configura con `MCP_SERVER_URL`, `MCP_API_KEY` y `GEMINI_API_KEY` (ver `mcp-host/.env.example`).
-- **MCP Server** (`mcp-server/`): corre como un **Cloudflare Worker**. Expone las herramientas de negocio (reservas, canchas, partidos, etc.) vía el protocolo MCP (Streamable HTTP) y se conecta a la base de datos PostgreSQL a través de **Cloudflare Hyperdrive** (pooling de conexiones y cacheo de queries). La base de datos en producción es un PostgreSQL gestionado en **Supabase**.
+- **MCP Server** (`mcp-server/`): corre como un **Cloudflare Worker**. Expone las herramientas de negocio (reservas, canchas, clases, etc.) vía el protocolo MCP (Streamable HTTP) y se conecta a la base de datos PostgreSQL a través de **Cloudflare Hyperdrive** (pooling de conexiones y cacheo de queries). La base de datos en producción es un PostgreSQL gestionado en **Supabase**.
 
 Flujo de un mensaje (según el diagrama):
 
@@ -23,16 +23,21 @@ Flujo de un mensaje (según el diagrama):
 
 ### Modelo de datos
 
-![DER](docs/der/DER.jpg)
+![DER](docs/der/der.jpg)
 
-Entidades principales:
+El esquema lo crea y migra la web ([padel-quento](https://github.com/JoacoMazza/padel-quento)); el DER es una copia del de su rama `main` (`docs/der/der.mmd` + `der.jpg`). El bot solo espeja con Drizzle las tablas que usa.
+
+Entidades principales que usa el bot:
 
 - **bookers**: quien reserva, identificado por teléfono. Los jugadores registrados (Player) viven en la misma tabla con `type = 'Player'` y sus datos propios (`account_id`, `category`, `scoring`).
 - **courts**, **schedules**, **out_of_services**: canchas (con su precio), horarios de apertura/cierre por día y períodos fuera de servicio.
-- **bookings**: reservas de cancha asociadas a un `booker` (por teléfono), un horario y el precio de la cancha al reservar.
-- **matches / match_players**: partidos abiertos a partir de una reserva y los jugadores anotados.
+- **bookings**: reservas de cancha asociadas a un `booker` (`booker_id`), un horario y el precio de la cancha al reservar. Los turnos de una clase tienen `lesson_id`.
+- **matches / match_players**: partidos abiertos armados en la web a partir de una reserva y sus jugadores. El bot no los gestiona: solo los muestra en el detalle de la reserva y avisa a los jugadores si se cancela el turno.
+- **fixed_bookings / fixed_booking_dates**: turnos fijos (misma cancha y hora cada semana o cada dos) y cada fecha reservada.
+- **lessons / lesson_schedules / inscriptions**: clases de los profesores, sus horarios semanales y los alumnos inscriptos.
+- **penalties**: movimientos de puntos de los jugadores (las penalizaciones por cancelar o bajarse tarde).
 
-> **El esquema es de la web.** La base la crea y migra la web de Quento (`padel-quento`, Next.js + TypeORM). En el bot, `mcp-server/src/db/schemas/*.ts` es un espejo en Drizzle (Cloudflare Workers no se lleva bien con TypeORM) de **solo las tablas que usa el bot**; el resto (cuentas, admins, chats, penalizaciones, turnos fijos, reseñas) existe en la base pero no se declara acá. Los estados son enums de Postgres cuyos valores replican `mcp-server/src/lib/enums/`. Si la web cambia una de estas tablas, hay que actualizar el schema correspondiente a mano.
+> **El esquema es de la web.** La base la crea y migra la web de Quento (`padel-quento`, Next.js + TypeORM). En el bot, `mcp-server/src/db/schemas/*.ts` es un espejo en Drizzle (Cloudflare Workers no se lleva bien con TypeORM) de **solo las tablas que usa el bot**; el resto (cuentas, admins, chats, mensajes y reseñas) existe en la base pero no se declara acá. Los estados son enums de Postgres cuyos valores replican `mcp-server/src/lib/enums/`. Si la web cambia una de estas tablas, hay que actualizar el schema correspondiente a mano.
 
 ### Convención de fechas
 
@@ -42,19 +47,19 @@ Los horarios de reservas y partidos se guardan como **hora de pared del club** e
 
 | Tool | Descripción |
 |---|---|
-| `get_available_bookings` | Turnos libres (descuenta reservas y períodos fuera de servicio) para una fecha (`date`, `YYYY-MM-DD`; **si se omite, hoy**) y opcionalmente una cancha (`courtId`) |
+| `get_available_bookings` | Turnos libres (descuenta reservas y períodos fuera de servicio) para una fecha (`date`, `YYYY-MM-DD`; **si se omite, hoy**) y opcionalmente una cancha (`courtId`), con el precio del turno en cada cancha |
 | `get_available_times` | Horarios de inicio (`HH:MM`) con al menos una cancha libre en una fecha (hoy por defecto); cada horario aparece una sola vez aunque haya varias canchas |
-| `check_time_availability` | Consulta un horario puntual (`time`, `HH:MM`, y `date` opcional): indica si está disponible y qué canchas están libres; si no, devuelve los horarios alternativos del día |
-| `get_my_bookings` / `get_booking_details` | Reservas futuras de un teléfono / detalle de una reserva (cancha, hora, estado, partido); solo para su dueño |
-| `cancel_booking` / `reschedule_booking` | Cancela o mueve a otro horario (y opcionalmente otra cancha) una reserva futura; validan que el teléfono sea el dueño y que el turno nuevo esté libre |
-| `get_club_info` | Cantidad de canchas por estado, horarios de apertura por día, duración del turno y zona horaria (no incluye precios ni política de cancelación) |
+| `check_time_availability` | Consulta un horario puntual (`time`, `HH:MM`, y `date` opcional): indica si está disponible y qué canchas están libres; si no, devuelve los horarios alternativos del día. Incluye el precio de cada cancha |
+| `get_my_bookings` / `get_booking_details` | Reservas futuras de un teléfono / detalle de una reserva (cancha, hora, estado, partido); solo para su dueño. Marcan los turnos de clase (`isLesson`) y las fechas de turnos fijos (`fixedBookingId`) |
+| `cancel_booking` / `reschedule_booking` | Cancela o mueve a otro horario (y opcionalmente otra cancha) una reserva futura; validan que el teléfono sea el dueño y que el turno nuevo esté libre. Cancelar con menos de 3 h descuenta 20 puntos a quien tiene cuenta (salvo clases y turnos fijos). Una fecha de turno fijo se libera sola, sin dar de baja el turno fijo. Los turnos de clase se pueden cancelar pero no mover |
+| `get_club_info` | Cantidad de canchas por estado, horarios de apertura por día, duración del turno y zona horaria |
 | `create_booking` | Reserva un turno futuro para un booker registrado (`courtId`, `bookerPhoneNumber`, `datetime`); valida grilla y disponibilidad |
 | `is_booker_registered` / `register_booker` | Consulta / alta de quien reserva, identificado por teléfono |
 | `list_courts` / `get_court_status` | Canchas (filtrables por estado) y estado de una cancha puntual |
 | `get_court_location` | Ubicación, dirección, ciudad, coordenadas y link de Google Maps para una cancha específica o el complejo |
-| `get_open_matches` | Partidos que buscan jugadores, filtrables por fecha, cancha o categoría |
-| `create_match_from_booking` | Convierte una reserva futura en un partido abierto que busca jugadores (la reserva conserva su estado) |
-| `join_match` / `leave_match` | Sumar o quitar a un jugador de un partido |
+| `get_my_fixed_bookings` / `cancel_fixed_booking` | Turnos fijos activos de un teléfono (cancha, día, hora, frecuencia) / da de baja un turno fijo completo y cancela sus fechas futuras, sin penalización |
+| `get_available_lessons` / `get_my_lessons` | Clases abiertas (profesor, precio, cupo y lugares libres, fechas, horarios semanales), marcando en cuáles está inscripto el cliente y cuáles da / solo las clases en las que está inscripto |
+| `enroll_in_lesson` / `leave_lesson` | Inscribe al cliente en una clase (solo jugadores con cuenta; clase activa, no terminada y con cupo; el profesor no se anota en la suya) / lo da de baja, sin penalización |
 
 ### Estructura del repo
 
@@ -63,13 +68,13 @@ Los horarios de reservas y partidos se guardan como **hora de pared del club** e
 ├── docker-compose.yaml       # Postgres local para desarrollo
 ├── docs/
 │   ├── mcp-arquitecture/     # Diagrama de arquitectura (.drawio / .jpg)
-│   └── der/                  # Diagrama entidad-relación (.drawio / .jpg)
+│   └── der/                  # Diagrama entidad-relación (.mmd / .jpg, copia del de padel-quento)
 ├── mcp-host/                  # Cliente/host MCP (FastAPI, Python + uv), desplegado en Railway
 └── mcp-server/                 # Servidor MCP (Cloudflare Worker) + acceso a datos
     ├── src/
     │   ├── index.ts           # Entry point del Worker (fetch handler, auth, MCP transport)
     │   ├── server.ts          # Fábrica del McpServer (uno por request) con sus tools registradas
-    │   ├── tools/             # Tools MCP agrupadas por dominio (bookings, courts, matches, booker)
+    │   ├── tools/             # Tools MCP agrupadas por dominio (bookings, courts, lessons, booker, ...)
     │   ├── db/
     │   │   ├── schemas/       # Espejo Drizzle de las tablas de la web que usa el bot
     │   │   ├── queries/       # Queries por entidad
@@ -203,9 +208,15 @@ Desde `mcp-server/`:
 # Cargar o actualizar el secreto de autenticación en Cloudflare (solo si cambia la clave):
 wrangler secret put MCP_API_KEY
 
+# Opcional: credenciales de WhatsApp Cloud API para los avisos a terceros (ver abajo).
+wrangler secret put WHATSAPP_ACCESS_TOKEN
+wrangler secret put WHATSAPP_PHONE_NUMBER_ID
+
 # Desplegar el Worker a Cloudflare:
 pnpm deploy   # ejecuta wrangler deploy
 ```
+
+**Avisos por WhatsApp.** `cancel_booking` avisa a las otras personas afectadas, igual que la web: a los demás jugadores si el turno era un partido abierto (armado en la web) y a los alumnos si era una clase. Se mandan con las **mismas plantillas aprobadas en Meta que usa la web** (`quento_partido_cancelado`, `quento_clase_cancelada_profesor`), así que el número configurado tiene que pertenecer a la cuenta de WhatsApp Business donde están aprobadas. Sin `WHATSAPP_ACCESS_TOKEN` o sin `WHATSAPP_PHONE_NUMBER_ID` no se manda ningún aviso, y un aviso que falla nunca hace fallar la tool. `WHATSAPP_API_VERSION` (por defecto `v23.0`) y `WHATSAPP_TEMPLATE_LANGUAGE` (por defecto `es_AR`) son opcionales.
 
 ### 2. Verificar el servicio desplegado
 
