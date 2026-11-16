@@ -26,7 +26,14 @@ export function whatsAppRecipients(phoneNumber: string): string[] {
   }
 
   if (international.startsWith("549")) {
-    return ["54" + international.slice(3), international];
+    const rest = international.slice(3);
+    const candidates = ["54" + rest];
+    if (rest.length === 10) {
+      candidates.push(`54${rest.slice(0, 4)}15${rest.slice(4)}`);
+      candidates.push(`54${rest.slice(0, 3)}15${rest.slice(3)}`);
+    }
+    candidates.push(international);
+    return candidates;
   }
 
   return [international];
