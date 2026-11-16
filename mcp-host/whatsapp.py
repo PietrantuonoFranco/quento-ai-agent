@@ -66,7 +66,13 @@ def _to_recipients(phone: str) -> list[str]:
         candidates.append("54" + phone[3:])
         candidates.append(phone)
     elif phone.startswith("549"):
-        candidates.append("54" + phone[3:])
+        rest = phone[3:]
+        candidates.append("54" + rest)
+        if len(rest) == 10:
+            # Prefijos de 4 digitos (ej: 2241 Chascomus -> 54224115470878)
+            candidates.append(f"54{rest[:4]}15{rest[4:]}")
+            # Prefijos de 3 digitos (ej: 221 La Plata -> 5422115...)
+            candidates.append(f"54{rest[:3]}15{rest[3:]}")
         candidates.append(phone)
     else:
         candidates.append(phone)
