@@ -31,7 +31,12 @@ describe("whatsAppRecipients", () => {
 
   it("prueba primero las variantes con las que Meta registra los celulares argentinos", () => {
     expect(whatsAppRecipients("5491123456789")).toEqual(["541115" + "23456789", "541123456789", "5491123456789"]);
-    expect(whatsAppRecipients("5492216049987")).toEqual(["542216049987", "5492216049987"]);
+    expect(whatsAppRecipients("5492216049987")).toEqual([
+      "542216049987",
+      "54221615049987",
+      "54221156049987",
+      "5492216049987",
+    ]);
   });
 });
 
@@ -81,7 +86,7 @@ describe("notify", () => {
 
     await notify(whatsappEnv, [{ names: "Ana", phoneNumber: "5492216049987" }], () => template, fetchFn);
 
-    expect(fetchFn.mock.calls.map(([, init]) => JSON.parse(init.body).to)).toEqual(["542216049987", "5492216049987"]);
+    expect(fetchFn.mock.calls.map(([, init]) => JSON.parse(init.body).to)).toEqual(["542216049987", "54221615049987"]);
   });
 
   it("nunca falla: un aviso que no se pudo mandar no frena la operación", async () => {
