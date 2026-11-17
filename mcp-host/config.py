@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     MCP_API_KEY: str = Field(..., validation_alias="MCP_API_KEY")
 
     # Gemini
-    GEMINI_API_KEY: str = Field(..., validation_alias="GEMINI_API_KEY")
+    GEMINI_API_KEY: str = Field("", validation_alias="GEMINI_API_KEY")
     GEMINI_MODEL: str = Field("gemini-3.6-flash", validation_alias="GEMINI_MODEL")
     # Anthropic (Claude)
     ANTHROPIC_API_KEY: str = Field("", validation_alias="ANTHROPIC_API_KEY")
