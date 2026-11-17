@@ -165,6 +165,8 @@ class AnthropicAgent:
                 }
                 try:
                     res = await client.post(ANTHROPIC_MESSAGES_URL, headers=headers, json=payload)
+                    if res.status_code >= 400:
+                        logger.error("Claude API error %s: %s (model: %s)", res.status_code, res.text, self._model)
                     res.raise_for_status()
                     data = res.json()
                 except Exception as e:
