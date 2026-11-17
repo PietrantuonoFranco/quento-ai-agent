@@ -177,7 +177,8 @@ class AnthropicAgent:
                 content_blocks = data.get("content", [])
                 stop_reason = data.get("stop_reason")
 
-                history.append({"role": "assistant", "content": content_blocks})
+                conversation_blocks = [b for b in content_blocks if b.get("type") != "thinking"]
+                history.append({"role": "assistant", "content": conversation_blocks})
 
                 if stop_reason != "tool_use":
                     text_parts = [b["text"] for b in content_blocks if b.get("type") == "text"]
