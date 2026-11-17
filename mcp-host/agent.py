@@ -151,6 +151,7 @@ class AnthropicAgent:
         headers = {
             "x-api-key": self._api_key,
             "anthropic-version": ANTHROPIC_VERSION,
+            "anthropic-beta": "thinking-binding-controls-2026-08-01",
             "content-type": "application/json",
         }
 
