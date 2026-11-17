@@ -1,7 +1,9 @@
 import asyncio
+import json
 import logging
 from typing import Any
 
+import httpx
 from google import genai
 from google.genai import errors, types
 from mcp import types as mcp_types
@@ -9,7 +11,7 @@ from mcp import types as mcp_types
 from client import ToolError, mcp_client
 from config import conf
 from prompts import build_system_prompt
-from tools import inject_phone, to_function_declarations
+from tools import inject_phone, to_anthropic_tools, to_function_declarations
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +115,107 @@ def _finish_reason(response: types.GenerateContentResponse) -> Any:
     return response.candidates[0].finish_reason if response.candidates else None
 
 
-def build_agent() -> Agent:
+ANTHROPIC_MESSAGES_URL = "https://api.anthropic.com/v1/messages"
+ANTHROPIC_VERSION = "2023-06-01"
+
+
+class AnthropicAgent:
+    """Runs Claude's tool-calling loop against the MCP server's tools via Anthropic Messages API."""
+
+    def __init__(self, mcp: Any, api_key: str, model: str, max_steps: int = MAX_STEPS) -> None:
+        self._mcp = mcp
+        self._api_key = api_key
+        self._model = model
+        self._max_steps = max_steps
+        self._tools: dict[str, mcp_types.Tool] = {}
+        self._declarations: list[dict[str, Any]] = []
+
+    async def load_tools(self) -> None:
+        tools = await self._mcp.list_tools()
+        self._tools = {t.name: t for t in tools}
+        self._declarations = to_anthropic_tools(tools)
+
+    async def respond(
+        self,
+        history: list[dict[str, Any]],
+        text: str,
+        phone: str,
+        profile_name: str | None = None,
+    ) -> str:
+        if not self._tools:
+            await self.load_tools()
+
+        start = len(history)
+        history.append({"role": "user", "content": text})
+
+        headers = {
+            "x-api-key": self._api_key,
+            "anthropic-version": ANTHROPIC_VERSION,
+            "content-type": "application/json",
+        }
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for _ in range(self._max_steps):
+                payload = {
+                    "model": self._model,
+                    "max_tokens": 1024,
+                    "system": build_system_prompt(profile_name),
+                    "tools": self._declarations,
+                    "messages": history,
+                }
+                try:
+                    res = await client.post(ANTHROPIC_MESSAGES_URL, headers=headers, json=payload)
+                    res.raise_for_status()
+                    data = res.json()
+                except Exception as e:
+                    logger.error("Claude request failed: %s", e)
+                    del history[start:]
+                    return FALLBACK_REPLY
+
+                content_blocks = data.get("content", [])
+                stop_reason = data.get("stop_reason")
+
+                history.append({"role": "assistant", "content": content_blocks})
+
+                if stop_reason != "tool_use":
+                    text_parts = [b["text"] for b in content_blocks if b.get("type") == "text"]
+                    return "".join(text_parts).strip() or FALLBACK_REPLY
+
+                tool_results = []
+                for block in content_blocks:
+                    if block.get("type") == "tool_use":
+                        name = block.get("name", "")
+                        tool = self._tools.get(name)
+                        if tool is None:
+                            tool_res = {"error": f"Unknown tool: {name}"}
+                        else:
+                            arguments = inject_phone(tool, dict(block.get("input") or {}), phone)
+                            try:
+                                tool_res = await self._mcp.call_tool(name, arguments)
+                            except ToolError as err:
+                                tool_res = {"error": str(err)}
+                            except Exception:
+                                logger.exception("Tool %s failed", name)
+                                tool_res = {"error": "The service is not available right now"}
+
+                        content_str = json.dumps(tool_res, ensure_ascii=False) if not isinstance(tool_res, str) else tool_res
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.get("id"),
+                            "content": content_str,
+                        })
+
+                history.append({"role": "user", "content": tool_results})
+
+        logger.warning("Stopped after %s steps without a final answer", self._max_steps)
+        return FALLBACK_REPLY
+
+
+def build_agent() -> Agent | AnthropicAgent:
+    if conf.ANTHROPIC_API_KEY:
+        logger.info("Using Anthropic Claude model: %s", conf.ANTHROPIC_MODEL)
+        return AnthropicAgent(mcp_client, conf.ANTHROPIC_API_KEY, conf.ANTHROPIC_MODEL)
+
     # Gemini answers 503 when the model is overloaded; the SDK retries transient errors with backoff.
     retry = types.HttpRetryOptions(attempts=5, initial_delay=1.0, max_delay=10.0, http_status_codes=[429, 500, 503, 504])
     llm = genai.Client(api_key=conf.GEMINI_API_KEY, http_options=types.HttpOptions(retry_options=retry))

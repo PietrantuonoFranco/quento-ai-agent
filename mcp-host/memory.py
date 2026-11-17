@@ -3,6 +3,7 @@
 import asyncio
 import time
 from collections.abc import Callable
+from typing import Any
 
 from google.genai import types
 
@@ -44,17 +45,28 @@ class ConversationStore:
         return self._locks.setdefault(phone, asyncio.Lock())
 
 
-def _trim(history: list[types.Content], limit: int) -> list[types.Content]:
+def _trim(history: list[Any], limit: int) -> list[Any]:
     trimmed = history[-limit:]
-    # Start at a real user message: a tool result or model turn without its counterpart is invalid for Gemini.
+    # Start at a real user message: a tool result or model turn without its counterpart is invalid.
     start = 0
     while start < len(trimmed) and not _is_user_text(trimmed[start]):
         start += 1
     return trimmed[start:]
 
 
-def _is_user_text(content: types.Content) -> bool:
-    return content.role == "user" and all(p.function_response is None for p in content.parts or [])
+def _is_user_text(content: Any) -> bool:
+    if isinstance(content, dict):
+        if content.get("role") != "user":
+            return False
+        c = content.get("content")
+        if isinstance(c, str):
+            return True
+        if isinstance(c, list):
+            return any(not isinstance(b, dict) or b.get("type") != "tool_result" for b in c)
+        return False
+    return getattr(content, "role", None) == "user" and all(
+        p.function_response is None for p in getattr(content, "parts", None) or []
+    )
 
 
 class SeenMessages:

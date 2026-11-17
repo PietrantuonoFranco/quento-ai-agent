@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # Gemini
     GEMINI_API_KEY: str = Field(..., validation_alias="GEMINI_API_KEY")
     GEMINI_MODEL: str = Field("gemini-3.6-flash", validation_alias="GEMINI_MODEL")
+    # Anthropic (Claude)
+    ANTHROPIC_API_KEY: str = Field("", validation_alias="ANTHROPIC_API_KEY")
+    ANTHROPIC_MODEL: str = Field("claude-3-5-haiku-20241022", validation_alias="ANTHROPIC_MODEL")
 
     # WhatsApp Cloud API. Empty secrets make the webhook reject everything (fail closed).
     WHATSAPP_VERIFY_TOKEN: str = Field("", validation_alias="WHATSAPP_VERIFY_TOKEN")

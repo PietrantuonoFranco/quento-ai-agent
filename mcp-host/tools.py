@@ -37,6 +37,17 @@ def to_function_declarations(tools: list[mcp_types.Tool]) -> list[types.Function
     ]
 
 
+def to_anthropic_tools(tools: list[mcp_types.Tool]) -> list[dict[str, Any]]:
+    return [
+        {
+            "name": tool.name,
+            "description": tool.description or "",
+            "input_schema": _model_schema(tool.input_schema),
+        }
+        for tool in tools
+    ]
+
+
 def inject_phone(tool: mcp_types.Tool, arguments: dict[str, Any], phone: str) -> dict[str, Any]:
     """Overwrite the tool's phone arguments with the customer's real number."""
     phone_args = PHONE_FIELDS & set(tool.input_schema.get("properties", {}))
